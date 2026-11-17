@@ -29,7 +29,7 @@ Options in `wrangler.jsonc`:
 - `PUBLIC_URL`: the base URL used in M3U and EPG links. Leave it empty to use the request's host.
 - `EPG_DAYS`: how many days of guide data to keep (default 3).
 - `DEFAULT_TIMEZONE`: the timezone for event times in M3U names and for parsing dates in event rules.
-- `limits.cpu_ms: 300000`: big provider lists and EPG files need more CPU time than the default allows, so this needs Workers Paid. If you're on the free plan, remove it.
+- CPU limits: Workers Free gives each request or cron run 10 ms of CPU, which is too little to sync a typical provider or EPG. On Workers Paid, add `"limits": { "cpu_ms": 300000 }` to `wrangler.jsonc`.
 - Cron jobs: a full refresh (sources, then EPG, then event rules) every 6 hours, plus an event-rule pass every 30 minutes.
 - An optional `API_TOKEN` secret works as a static admin bearer token.
 
