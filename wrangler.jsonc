@@ -18,7 +18,7 @@
 		{
 			"binding": "DB",
 			"database_name": "iptv-web",
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			"database_id": "efe9f126-392d-41a8-af82-696c9e762ded",
 			"migrations_dir": "migrations"
 		}
 	],
