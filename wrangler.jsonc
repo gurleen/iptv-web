@@ -1,0 +1,41 @@
+/**
+ * Cloudflare Workers config. Before first deploy:
+ *   npx wrangler d1 create iptv-web        -> paste database_id below
+ *   npx wrangler r2 bucket create iptv-web
+ *   npx wrangler d1 migrations apply iptv-web --remote
+ *   npx wrangler secret put ADMIN_PASSWORD
+ *   npx wrangler secret put SESSION_SECRET
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "iptv-web",
+	"compatibility_date": "2025-09-02",
+	"compatibility_flags": ["nodejs_compat"],
+	"main": "./src/server.ts",
+	"observability": { "enabled": true },
+	"upload_source_maps": true,
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "iptv-web",
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "migrations"
+		}
+	],
+	"r2_buckets": [{ "binding": "BUCKET", "bucket_name": "iptv-web" }],
+	"triggers": {
+		// Full refresh (sources -> EPG -> event rules) every 6 hours,
+		// plus a light event-rule pass every 30 minutes.
+		"crons": ["0 */6 * * *", "*/30 * * * *"]
+	},
+	// Large provider lists / EPGs need more than the default 30s of CPU (Workers Paid).
+	"limits": { "cpu_ms": 300000 },
+	"vars": {
+		// Public base URL used in M3U/EPG links. Leave empty to derive from the request.
+		"PUBLIC_URL": "",
+		// How many days of guide data to keep/emit.
+		"EPG_DAYS": "3",
+		// Timezone used for event times in M3U names and for parsing dates in event rules.
+		"DEFAULT_TIMEZONE": "America/New_York"
+	}
+}

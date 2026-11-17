@@ -1,0 +1,4 @@
+ADMIN_PASSWORD=change-me
+SESSION_SECRET=a-long-random-string
+# Optional: a static admin bearer token for agents (in addition to tokens created in the UI)
+# API_TOKEN=
