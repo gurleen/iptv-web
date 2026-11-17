@@ -271,3 +271,20 @@ export const meta = sqliteTable('meta', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
 })
+
+/** Background jobs run by the queue consumer (syncs, EPG refreshes, rule runs). */
+export const jobs = sqliteTable(
+  'jobs',
+  {
+    id: text('id').primaryKey(),
+    type: text('type').notNull(), // source_sync | epg_refresh | rules | full_refresh
+    targetId: text('target_id'),
+    state: text('state').notNull().default('queued'), // queued | running | done | error
+    result: text('result', { mode: 'json' }).$type<unknown>(),
+    error: text('error'),
+    createdAt: integer('created_at').notNull(),
+    startedAt: integer('started_at'),
+    finishedAt: integer('finished_at'),
+  },
+  (t) => [index('jobs_created_idx').on(t.createdAt)],
+)

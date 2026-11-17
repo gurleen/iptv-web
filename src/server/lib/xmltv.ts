@@ -129,9 +129,13 @@ export async function parseXmltv(stream: ReadableStream<Uint8Array>, h: XmltvHan
     else buf += r.value
 
     let pos = 0
+    // Cache the next-tag positions: re-scanning the rest of the buffer for '<channel' before every
+    // programme made parsing quadratic (most files have no channels left after the header).
+    let ci = buf.indexOf('<channel', pos)
+    let pi = buf.indexOf('<programme', pos)
     for (;;) {
-      const ci = buf.indexOf('<channel', pos)
-      const pi = buf.indexOf('<programme', pos)
+      if (ci !== -1 && ci < pos) ci = buf.indexOf('<channel', pos)
+      if (pi !== -1 && pi < pos) pi = buf.indexOf('<programme', pos)
       if (ci === -1 && pi === -1) {
         // keep only a small tail in case a tag name is split across chunks
         pos = Math.max(pos, buf.length - 16)

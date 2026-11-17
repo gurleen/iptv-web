@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import puppeteer, { type Browser, type Page } from '@cloudflare/puppeteer'
 
 /**
@@ -16,13 +17,14 @@ export const directFetcher: UpstreamFetcher = {
   close: async () => {},
 }
 
-/** Bytes pulled from the page per CDP round trip (kept well under WebSocket message limits). */
-const CHUNK = 512 * 1024
+/** Compressed bytes pulled from the page per CDP round trip (~1.4MB of base64 per message). */
+const CHUNK = 1024 * 1024
 
 /**
  * Fetches through a Browser Rendering session. The page navigates to the provider's origin and runs
- * fetch() there (same-origin, so no CORS), keeps the body in page memory, and we pull it back in
- * chunks as a ReadableStream so big EPG files never sit in Worker memory at once.
+ * fetch() there (same-origin, so no CORS), gzips the body in the page (XMLTV/JSON shrink ~10x), and we
+ * pull it back in chunks, decoding base64 natively and gunzipping as a stream. Big EPG files never sit
+ * in Worker memory at once, and the Worker does very little CPU work per byte.
  */
 export class BrowserFetcher implements UpstreamFetcher {
   private browser: Browser | null = null
@@ -71,9 +73,10 @@ export class BrowserFetcher implements UpstreamFetcher {
         }
         try {
           const r = await fetch(u.toString(), { headers: hdrs, credentials: 'omit' })
-          const buf = new Uint8Array(await r.arrayBuffer())
-          ;(globalThis as any).__iptvBody = buf
-          return { ok: true as const, status: r.status, headers: [...r.headers] as [string, string][], size: buf.byteLength }
+          const raw = await r.arrayBuffer()
+          const gz = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer())
+          ;(globalThis as any).__iptvBody = gz
+          return { ok: true as const, status: r.status, headers: [...r.headers] as [string, string][], size: gz.byteLength, rawSize: raw.byteLength }
         } catch (e) {
           return { ok: false as const, error: String(e), page: location.href }
         }
@@ -84,7 +87,7 @@ export class BrowserFetcher implements UpstreamFetcher {
     if (!meta.ok) throw new Error(`browser fetch failed (${meta.error}; page at ${meta.page})`)
 
     let offset = 0
-    const body = new ReadableStream<Uint8Array>({
+    const gzipped = new ReadableStream<Uint8Array>({
       pull: async (controller) => {
         if (offset >= meta.size) {
           controller.close()
@@ -101,13 +104,12 @@ export class BrowserFetcher implements UpstreamFetcher {
           offset,
           CHUNK,
         )
-        const bin = atob(b64)
-        const bytes = new Uint8Array(bin.length)
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        const bytes = new Uint8Array(Buffer.from(b64, 'base64'))
         offset += bytes.length
         controller.enqueue(bytes)
       },
     })
+    const body = gzipped.pipeThrough(new DecompressionStream('gzip') as unknown as TransformStream<Uint8Array, Uint8Array>)
     // the page already decoded any Content-Encoding, so don't pass it on
     const h = new Headers(meta.headers.filter(([k]) => !/^(content-encoding|content-length|transfer-encoding)$/i.test(k)))
     return new Response(meta.status === 204 || meta.status === 304 ? null : body, { status: meta.status, headers: h })

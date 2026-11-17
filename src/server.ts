@@ -1,6 +1,6 @@
 import handler from '@tanstack/react-start/server-entry'
 import { app } from './server/api/app'
-import { handleScheduled } from './server/jobs'
+import { handleQueue, handleScheduled } from './server/jobs'
 
 const WORKER_PATHS = /^\/(api\/|mcp$|playlist\.m3u$|events\.m3u$|epg\.xml(\.gz)?$|stream\/)/
 
@@ -13,4 +13,7 @@ export default {
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(handleScheduled(controller, env))
   },
-} satisfies ExportedHandler<Env>
+  async queue(batch: MessageBatch<{ jobId: string }>, env: Env) {
+    await handleQueue(batch, env)
+  },
+} satisfies ExportedHandler<Env, { jobId: string }>

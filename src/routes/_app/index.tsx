@@ -2,11 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { RefreshCw } from 'lucide-react'
 import { PageHeader } from '@/components/app/page-header'
+import { RecentJobs } from '@/components/app/recent-jobs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useMutate } from '@/hooks/use-mutate'
-import { api, fmtAgo, type EpgSource, type Source } from '@/lib/api'
+import { useJob } from '@/hooks/use-job'
+import { api, fmtAgo, type EpgSource, type Job, type Source } from '@/lib/api'
 
 export const Route = createFileRoute('/_app/')({ component: Dashboard })
 
@@ -28,10 +29,7 @@ function Dashboard() {
   const stats = useQuery({ queryKey: ['stats'], queryFn: () => api<Stats>('/stats') })
   const sources = useQuery({ queryKey: ['sources'], queryFn: () => api<Source[]>('/sources') })
   const epg = useQuery({ queryKey: ['epg-sources'], queryFn: () => api<EpgSource[]>('/epg-sources') })
-  const refresh = useMutate(() => api('/refresh', { method: 'POST' }), {
-    invalidate: [['stats'], ['sources'], ['epg-sources'], ['lineup'], ['events']],
-    success: 'Refresh complete',
-  })
+  const refresh = useJob({ invalidate: [['stats'], ['sources'], ['epg-sources'], ['lineup'], ['events']], success: () => 'Refresh complete' })
   const s = stats.data
 
   return (
@@ -40,8 +38,8 @@ function Dashboard() {
         title="Dashboard"
         description={`Last full refresh: ${s?.lastFullRefresh ? fmtAgo(Date.parse(s.lastFullRefresh)) : 'never'} · runs automatically every 6h`}
       >
-        <Button onClick={() => refresh.mutate(undefined)} disabled={refresh.isPending}>
-          <RefreshCw className={refresh.isPending ? 'animate-spin' : ''} /> {refresh.isPending ? 'Refreshing…' : 'Refresh everything'}
+        <Button onClick={() => refresh.start(() => api<Job>('/refresh', { method: 'POST' }), 'all', 'Refreshing sources, EPG and events…')} disabled={refresh.running}>
+          <RefreshCw className={refresh.running ? 'animate-spin' : ''} /> {refresh.running ? 'Refreshing…' : 'Refresh everything'}
         </Button>
       </PageHeader>
 
@@ -100,6 +98,7 @@ function Dashboard() {
           </CardContent>
         </Card>
       </div>
+      <RecentJobs names={Object.fromEntries([...(sources.data ?? []), ...(epg.data ?? [])].map((x) => [x.id, x.name]))} />
     </>
   )
 }

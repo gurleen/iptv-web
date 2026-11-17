@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { ConfirmButton } from '@/components/app/confirm'
 import { Field } from '@/components/app/field'
 import { PageHeader } from '@/components/app/page-header'
@@ -12,8 +11,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useJob } from '@/hooks/use-job'
 import { useMutate } from '@/hooks/use-mutate'
-import { api, fmtAgo, type EpgSource } from '@/lib/api'
+import { api, fmtAgo, type EpgSource, type Job } from '@/lib/api'
 
 export const Route = createFileRoute('/_app/epg')({ component: Epg })
 
@@ -21,11 +21,10 @@ function Epg() {
   const list = useQuery({ queryKey: ['epg-sources'], queryFn: () => api<EpgSource[]>('/epg-sources') })
   const [adding, setAdding] = useState(false)
   const inv = [['epg-sources'], ['stats']]
-  const refreshOne = useMutate((id: string) => api<{ ok: boolean; programmes?: number; error?: string }>(`/epg-sources/${id}/refresh`, { method: 'POST' }), {
+  const refresh = useJob({
     invalidate: inv,
-    onSuccess: (r) => (r.ok ? toast.success(`Loaded ${r.programmes} programmes`) : toast.error(r.error)),
+    success: (j) => ((j.result as any)?.programmes != null ? `Loaded ${(j.result as any).programmes} programmes` : 'EPG refreshed'),
   })
-  const refreshAll = useMutate(() => api('/epg/refresh', { method: 'POST' }), { invalidate: inv, success: 'EPG refreshed' })
   const toggle = useMutate((v: { id: string; enabled: boolean }) => api(`/epg-sources/${v.id}`, { method: 'PATCH', body: { enabled: v.enabled } }), { invalidate: inv })
   const del = useMutate((id: string) => api(`/epg-sources/${id}`, { method: 'DELETE' }), { invalidate: inv, success: 'Deleted' })
 
@@ -35,8 +34,12 @@ function Epg() {
         title="EPG sources"
         description="Guide data is only stored for channels mapped in your lineup. Refresh after changing mappings."
       >
-        <Button variant="outline" onClick={() => refreshAll.mutate(undefined)} disabled={refreshAll.isPending}>
-          <RefreshCw className={refreshAll.isPending ? 'animate-spin' : ''} /> Refresh all
+        <Button
+          variant="outline"
+          onClick={() => refresh.start(() => api<Job>('/epg/refresh', { method: 'POST' }), 'all', 'Refreshing all EPG sources…')}
+          disabled={refresh.running}
+        >
+          <RefreshCw className={refresh.running && refresh.runningKey === 'all' ? 'animate-spin' : ''} /> {refresh.running && refresh.runningKey === 'all' ? 'Refreshing…' : 'Refresh all'}
         </Button>
         <Button onClick={() => setAdding(true)}>
           <Plus /> Add XMLTV
@@ -78,8 +81,14 @@ function Epg() {
                   <Switch checked={e.enabled} onCheckedChange={(v) => toggle.mutate({ id: e.id, enabled: v })} />
                 </TableCell>
                 <TableCell className="text-right whitespace-nowrap">
-                  <Button size="icon" variant="ghost" title="Refresh" disabled={refreshOne.isPending} onClick={() => refreshOne.mutate(e.id)}>
-                    <RefreshCw className={refreshOne.isPending && refreshOne.variables === e.id ? 'animate-spin' : ''} />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Refresh"
+                    disabled={refresh.running}
+                    onClick={() => refresh.start(() => api<Job>(`/epg-sources/${e.id}/refresh`, { method: 'POST' }), e.id, `Refreshing ${e.name}…`)}
+                  >
+                    <RefreshCw className={refresh.running && refresh.runningKey === e.id ? 'animate-spin' : ''} />
                   </Button>
                   <ConfirmButton title={`Delete ${e.name}?`} description="Channels mapped to it lose their guide." onConfirm={() => del.mutate(e.id)}>
                     <Button size="icon" variant="ghost">
@@ -92,19 +101,23 @@ function Epg() {
           </TableBody>
         </Table>
       </div>
-      {adding && <AddDialog onClose={() => setAdding(false)} />}
+      {adding && (
+        <AddDialog
+          onClose={() => setAdding(false)}
+          onCreated={(job) => void refresh.start(async () => job, job.targetId ?? 'new', 'EPG source added — loading guide…')}
+        />
+      )}
     </>
   )
 }
 
-function AddDialog({ onClose }: { onClose: () => void }) {
+function AddDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (job: Job) => void }) {
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
-  const add = useMutate(() => api<{ sync: { ok: boolean; channels?: number; error?: string } }>('/epg-sources', { body: { name, url, type: 'xmltv' } }), {
+  const add = useMutate(() => api<{ job: Job | null }>('/epg-sources', { body: { name, url, type: 'xmltv' } }), {
     invalidate: [['epg-sources']],
     onSuccess: (r) => {
-      if (r.sync?.ok) toast.success(`Added — ${r.sync.channels} channels found`)
-      else toast.warning(`Added, but refresh failed: ${r.sync?.error}`)
+      if (r.job) onCreated(r.job)
       onClose()
     },
   })

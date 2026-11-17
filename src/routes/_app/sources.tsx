@@ -13,8 +13,9 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useJob } from '@/hooks/use-job'
 import { useMutate } from '@/hooks/use-mutate'
-import { api, fmtAgo, type Source } from '@/lib/api'
+import { api, fmtAgo, type Job, type Source } from '@/lib/api'
 
 export const Route = createFileRoute('/_app/sources')({ component: Sources })
 
@@ -26,10 +27,8 @@ function Sources() {
   const [editing, setEditing] = useState<{ id?: string; form: Form } | null>(null)
   const inv = [['sources'], ['stats'], ['epg-sources'], ['source-channels']]
 
-  const sync = useMutate((id: string) => api<{ ok: boolean; channels?: number; error?: string }>(`/sources/${id}/sync`, { method: 'POST' }), {
-    invalidate: inv,
-    onSuccess: (r) => (r.ok ? toast.success(`Synced ${r.channels} channels`) : toast.error(r.error)),
-  })
+  const sync = useJob({ invalidate: inv, success: (j) => `Synced ${(j.result as any)?.channels ?? ''} channels` })
+  const initialSync = useJob({ invalidate: inv, success: (j) => `Synced ${(j.result as any)?.channels ?? ''} channels` })
   const del = useMutate((id: string) => api(`/sources/${id}`, { method: 'DELETE' }), { invalidate: inv, success: 'Source deleted' })
 
   return (
@@ -86,8 +85,14 @@ function Sources() {
                       {s.lastSyncError && <p className="mt-1 max-w-64 truncate text-xs text-destructive">{s.lastSyncError}</p>}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      <Button size="icon" variant="ghost" title="Sync now" disabled={sync.isPending} onClick={() => sync.mutate(s.id)}>
-                        <RefreshCw className={sync.isPending && sync.variables === s.id ? 'animate-spin' : ''} />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Sync now"
+                        disabled={sync.running}
+                        onClick={() => sync.start(() => api<Job>(`/sources/${s.id}/sync`, { method: 'POST' }), s.id, `Syncing ${s.name}…`)}
+                      >
+                        <RefreshCw className={sync.running && sync.runningKey === s.id ? 'animate-spin' : ''} />
                       </Button>
                       <Button
                         size="icon"
@@ -119,12 +124,20 @@ function Sources() {
           </Table>
         </div>
       )}
-      {editing && <SourceDialog key={editing.id ?? 'new'} id={editing.id} initial={editing.form} onClose={() => setEditing(null)} />}
+      {editing && (
+        <SourceDialog
+          key={editing.id ?? 'new'}
+          id={editing.id}
+          initial={editing.form}
+          onClose={() => setEditing(null)}
+          onCreated={(job) => void initialSync.start(async () => job, 'new', 'Source added — syncing channels…')}
+        />
+      )}
     </>
   )
 }
 
-function SourceDialog({ id, initial, onClose }: { id?: string; initial: Form; onClose: () => void }) {
+function SourceDialog({ id, initial, onClose, onCreated }: { id?: string; initial: Form; onClose: () => void; onCreated: (job: Job) => void }) {
   const [f, setF] = useState(initial)
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((p) => ({ ...p, [k]: v }))
   const save = useMutate(
@@ -135,9 +148,11 @@ function SourceDialog({ id, initial, onClose }: { id?: string; initial: Form; on
         if (!f.password) delete body.password
         return api(`/sources/${id}`, { method: 'PATCH', body })
       }
-      return api('/sources', { body })
+      const r = await api<{ job: Job | null }>('/sources', { body })
+      if (r.job) onCreated(r.job)
+      return r
     },
-    { invalidate: [['sources'], ['stats'], ['epg-sources']], success: id ? 'Saved' : 'Source added and synced', onSuccess: onClose },
+    { invalidate: [['sources'], ['stats'], ['epg-sources']], success: id ? 'Saved' : undefined, onSuccess: onClose },
   )
   const test = useMutate(() => api<{ ok: boolean; error?: string; account?: any }>('/sources/test', { body: f }), {
     onSuccess: (r) => (r.ok ? toast.success(`OK — ${r.account?.status ?? 'active'}, max ${r.account?.max_connections ?? '?'} connections`) : toast.error(r.error)),
@@ -213,7 +228,7 @@ function SourceDialog({ id, initial, onClose }: { id?: string; initial: Form; on
             {test.isPending ? 'Testing…' : 'Test'}
           </Button>
           <Button disabled={save.isPending || !f.name || !f.baseUrl || !f.username || (!id && !f.password)} onClick={() => save.mutate(undefined)}>
-            {save.isPending ? (id ? 'Saving…' : 'Adding & syncing…') : 'Save'}
+            {save.isPending ? (id ? 'Saving…' : 'Checking login…') : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>

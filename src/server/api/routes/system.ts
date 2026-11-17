@@ -1,10 +1,10 @@
 import { z } from '@hono/zod-openapi'
 import { getMeta } from '../../db'
 import { checkPassword, clearSessionCookie, createSessionCookie, generateToken } from '../../lib/auth'
-import { runFullRefresh } from '../../jobs'
+import { enqueueJob, getJob, listJobs } from '../../jobs'
 import { HttpError, IdParam, newRouter, route, valid } from '../hono'
 import { touchLineup } from '../lineup-store'
-import { OkSchema, Token } from '../schemas'
+import { Job, OkSchema, Token } from '../schemas'
 
 const app = newRouter()
 
@@ -133,13 +133,25 @@ app.openapi(
     method: 'post',
     path: '/refresh',
     tags: ['System'],
-    summary: 'Full refresh: sync all sources, refresh all EPG, run all event rules',
-    response: z.object({ sources: z.array(z.any()), epg: z.array(z.any()), rules: z.array(z.any()) }),
+    summary: 'Full refresh (background): sync all sources, refresh all EPG, run all event rules',
+    description: 'Returns a job immediately; it queues one job per source/EPG source plus a final rules run.',
+    response: Job,
+    status: 202 as any,
   }),
+  async (c) => c.json(await enqueueJob(c.env, 'full_refresh'), 202),
+)
+
+app.openapi(
+  route({ method: 'get', path: '/jobs', tags: ['System'], summary: 'Recent background jobs (newest first)', query: z.object({ limit: z.coerce.number().int().min(1).max(200).optional() }), response: z.array(Job) }),
+  async (c) => c.json((await listJobs(c.env, (valid(c, 'query') as { limit?: number }).limit ?? 30)) as any),
+)
+
+app.openapi(
+  route({ method: 'get', path: '/jobs/{id}', tags: ['System'], summary: 'Get a background job', params: IdParam, response: Job }),
   async (c) => {
-    const r = await runFullRefresh(c.env)
-    await touchLineup(c.env)
-    return c.json(r)
+    const job = await getJob(c.env, (valid(c, 'param') as { id: string }).id)
+    if (!job) throw new HttpError(404, 'job not found')
+    return c.json(job as any)
   },
 )
 

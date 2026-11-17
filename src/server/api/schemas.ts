@@ -326,6 +326,20 @@ export const RuleInput = z
   .object({ ...ruleFields, name: z.string().min(1), kind: z.enum(['source_channel', 'epg_programme']), pattern: z.string().min(1) })
   .openapi('EventRuleInput')
 
+export const Job = z
+  .object({
+    id: z.string(),
+    type: z.enum(['source_sync', 'epg_refresh', 'rules', 'full_refresh']),
+    targetId: z.string().nullable(),
+    state: z.enum(['queued', 'running', 'done', 'error']),
+    result: z.unknown(),
+    error: z.string().nullable(),
+    createdAt: z.number(),
+    startedAt: Ts,
+    finishedAt: Ts,
+  })
+  .openapi('Job', { description: 'Background job. Poll GET /api/jobs/{id} until state is done or error.' })
+
 export const Token = z
   .object({ id: Id, name: z.string(), scope: z.enum(['admin', 'output']), prefix: z.string(), lastUsedAt: Ts, createdAt: z.number() })
   .openapi('ApiToken')

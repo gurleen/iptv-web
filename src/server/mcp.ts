@@ -105,7 +105,7 @@ export function buildMcpServer(api: ApiCaller) {
   tool('list_sources', 'List Xtream sources with sync status and channel counts.', {}, () => api('GET', '/sources'), true)
   tool(
     'sync_sources',
-    'Re-sync channels from one source (sourceId) or all enabled sources.',
+    'Queue a channel re-sync for one source (sourceId) or all enabled sources. Returns job(s); use get_job to wait.',
     { sourceId: z.string().optional() },
     (a) => (a.sourceId ? api('POST', `/sources/${a.sourceId}/sync`) : api('POST', '/sources/sync')),
   )
@@ -268,7 +268,28 @@ export function buildMcpServer(api: ApiCaller) {
     },
     (a) => api('POST', '/lineup/auto-map-epg', a),
   )
-  tool('refresh_epg', 'Reload all EPG sources (needed after changing EPG mappings), then re-run event rules.', {}, () => api('POST', '/epg/refresh'))
+  tool(
+    'refresh_epg',
+    'Queue a reload of all EPG sources (needed after changing EPG mappings), then an event-rule run. Returns a job; use get_job to wait.',
+    {},
+    () => api('POST', '/epg/refresh'),
+  )
+  tool(
+    'get_job',
+    'Check a background job (syncs / EPG refreshes). waitSeconds (max 50) polls until it finishes. Fan-out jobs list their children in result.queued. Omit id to list recent jobs.',
+    { id: z.string().optional(), waitSeconds: z.number().min(0).max(50).optional() },
+    async (a) => {
+      if (!a.id) return api('GET', '/jobs?limit=15')
+      const deadline = Date.now() + (a.waitSeconds ?? 0) * 1000
+      for (;;) {
+        const r = await api('GET', `/jobs/${a.id}`)
+        const state = (r.data as { state?: string } | null)?.state
+        if (r.status >= 400 || state === 'done' || state === 'error' || Date.now() >= deadline) return r
+        await new Promise((res) => setTimeout(res, 2000))
+      }
+    },
+    true,
+  )
   tool(
     'get_channel_guide',
     "A lineup channel's programmes (default: next 24h).",

@@ -33,6 +33,9 @@ MCP: the same operations are available as MCP tools at {{BASE}}/mcp (Streamable 
    finish with \`POST /api/epg/refresh\`.
 8. Health: \`GET /api/lineup/channels?brokenStreams=true\` lists channels whose upstream streams all vanished.
 
+Syncs and EPG refreshes run as background jobs: those endpoints return a job right away; poll
+\`GET /api/jobs/{id}\` (MCP: \`get_job\` with \`waitSeconds\`) until \`state\` is \`done\` or \`error\`.
+
 Always prefer \`dryRun: true\` first for rename / clean-names / auto-map-epg, and \`GET /api/lineup/export\`
 before large destructive changes (restore with \`POST /api/lineup/import\`).
 

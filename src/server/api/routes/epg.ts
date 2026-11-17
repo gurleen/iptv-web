@@ -2,21 +2,13 @@ import { z } from '@hono/zod-openapi'
 import { eq } from 'drizzle-orm'
 import { schema } from '../../db'
 import { newId } from '../../lib/ids'
-import { syncAllEpg, syncEpgSource } from '../../sync/epg'
-import { runAllRules } from '../../events/rules'
+import { enqueueJob } from '../../jobs'
 import { HttpError, IdParam, db, newRouter, notFound, route, valid } from '../hono'
-import { EpgChannel, EpgSource, EpgSourceInput, OkSchema, PageQuery, Programme, paginated } from '../schemas'
+import { EpgChannel, EpgSource, EpgSourceInput, Job, OkSchema, PageQuery, Programme, paginated } from '../schemas'
 
 const T = ['EPG']
 const app = newRouter()
 
-const SyncResult = z.object({
-  epgSourceId: z.string(),
-  ok: z.boolean(),
-  channels: z.number().optional(),
-  programmes: z.number().optional(),
-  error: z.string().optional(),
-})
 
 const ser = (r: typeof schema.epgSources.$inferSelect): z.infer<typeof EpgSource> => ({ ...r, type: r.type as 'xmltv' | 'xtream' })
 
@@ -32,7 +24,7 @@ app.openapi(
     tags: T,
     summary: 'Add an external XMLTV source',
     body: EpgSourceInput.extend({ syncNow: z.boolean().optional() }),
-    response: z.object({ epgSource: EpgSource, sync: SyncResult.nullable() }),
+    response: z.object({ epgSource: EpgSource, job: Job.nullable() }),
     status: 201,
   }),
   async (c) => {
@@ -46,9 +38,9 @@ app.openapi(
       id, name: b.name, type, url: b.url ?? null, sourceId: b.sourceId ?? null,
       enabled: b.enabled ?? true, priority: b.priority ?? 100, createdAt: now, updatedAt: now,
     })
-    const sync = b.syncNow === false ? null : await syncEpgSource(c.env, id)
+    const job = b.syncNow === false ? null : await enqueueJob(c.env, 'epg_refresh', id)
     const row = await db(c).query.epgSources.findFirst({ where: eq(schema.epgSources.id, id) })
-    return c.json({ epgSource: ser(row!), sync }, 201)
+    return c.json({ epgSource: ser(row!), job } as any, 201)
   },
 )
 
@@ -78,10 +70,12 @@ app.openapi(
 )
 
 app.openapi(
-  route({ method: 'post', path: '/epg-sources/{id}/refresh', tags: T, summary: 'Refresh one EPG source', params: IdParam, response: SyncResult }),
+  route({ method: 'post', path: '/epg-sources/{id}/refresh', tags: T, summary: 'Queue a refresh of one EPG source (background job)', params: IdParam, response: Job, status: 202 as any }),
   async (c) => {
     const { id } = valid(c, 'param') as { id: string }
-    return c.json(await syncEpgSource(c.env, id))
+    const exists = await db(c).query.epgSources.findFirst({ where: eq(schema.epgSources.id, id) })
+    if (!exists) throw notFound('epg source')
+    return c.json((await enqueueJob(c.env, 'epg_refresh', id)) as any, 202)
   },
 )
 
@@ -90,15 +84,12 @@ app.openapi(
     method: 'post',
     path: '/epg/refresh',
     tags: T,
-    summary: 'Refresh all EPG sources, then re-run event rules',
-    description: 'Programmes are only stored for EPG channels mapped into the lineup, so run this after changing EPG mappings.',
-    response: z.object({ epg: z.array(SyncResult), rules: z.array(z.object({ ruleId: z.string(), matches: z.number().optional(), error: z.string().optional() })) }),
+    summary: 'Queue a refresh of all EPG sources, then an event-rule run (background job)',
+    description: 'Programmes are only stored for EPG channels mapped into the lineup, so run this after changing EPG mappings. Poll GET /api/jobs/{id}.',
+    response: Job,
+    status: 202 as any,
   }),
-  async (c) => {
-    const epg = await syncAllEpg(c.env)
-    const rules = await runAllRules(c.env)
-    return c.json({ epg, rules })
-  },
+  async (c) => c.json((await enqueueJob(c.env, 'epg_refresh')) as any, 202),
 )
 
 const ChQuery = z.object({

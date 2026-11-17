@@ -4,18 +4,11 @@ import { schema } from '../../db'
 import { newId } from '../../lib/ids'
 import { fetcherFor } from '../../lib/upstream'
 import { XtreamClient, normalizeBaseUrl } from '../../lib/xtream'
-import { syncAllSources, syncSource } from '../../sync/sources'
+import { enqueueJob } from '../../jobs'
 import { HttpError, IdParam, db, newRouter, notFound, route, valid } from '../hono'
-import { OkSchema, Source, SourceInput, SourcePatch } from '../schemas'
+import { Job, OkSchema, Source, SourceInput, SourcePatch } from '../schemas'
 
 const T = ['Sources']
-const SyncResult = z.object({
-  sourceId: z.string(),
-  ok: z.boolean(),
-  channels: z.number().optional(),
-  removed: z.number().optional(),
-  error: z.string().optional(),
-})
 
 const app = newRouter()
 
@@ -80,9 +73,9 @@ app.openapi(
     path: '/sources',
     tags: T,
     summary: 'Add an Xtream source',
-    description: 'Validates credentials, optionally registers its EPG and runs an initial sync.',
+    description: 'Validates credentials, optionally registers its EPG, and queues an initial sync job.',
     body: SourceInput,
-    response: z.object({ source: Source, sync: SyncResult.nullable() }),
+    response: z.object({ source: Source, job: Job.nullable() }),
     status: 201,
   }),
   async (c) => {
@@ -122,9 +115,9 @@ app.openapi(
         updatedAt: now,
       })
     }
-    const sync = b.syncNow === false ? null : await syncSource(c.env, id)
+    const job = b.syncNow === false ? null : await enqueueJob(c.env, 'source_sync', id)
     const row = await db(c).query.sources.findFirst({ where: eq(schema.sources.id, id) })
-    return c.json({ source: serialize(row!, sync?.channels), sync }, 201)
+    return c.json({ source: serialize(row!, 0), job } as any, 201)
   },
 )
 
@@ -168,16 +161,23 @@ app.openapi(
 )
 
 app.openapi(
-  route({ method: 'post', path: '/sources/{id}/sync', tags: T, summary: 'Sync channels from a source now', params: IdParam, response: SyncResult }),
+  route({ method: 'post', path: '/sources/{id}/sync', tags: T, summary: 'Queue a channel sync for a source (background job)', params: IdParam, response: Job, status: 202 as any }),
   async (c) => {
     const { id } = valid(c, 'param') as { id: string }
-    return c.json(await syncSource(c.env, id))
+    const exists = await db(c).query.sources.findFirst({ where: eq(schema.sources.id, id) })
+    if (!exists) throw notFound('source')
+    return c.json((await enqueueJob(c.env, 'source_sync', id)) as any, 202)
   },
 )
 
 app.openapi(
-  route({ method: 'post', path: '/sources/sync', tags: T, summary: 'Sync all enabled sources', response: z.array(SyncResult) }),
-  async (c) => c.json(await syncAllSources(c.env)),
+  route({ method: 'post', path: '/sources/sync', tags: T, summary: 'Queue a sync of every enabled source (one job each)', response: z.array(Job), status: 202 as any }),
+  async (c) => {
+    const rows = await db(c).select({ id: schema.sources.id }).from(schema.sources).where(eq(schema.sources.enabled, true))
+    const jobs = []
+    for (const r of rows) jobs.push(await enqueueJob(c.env, 'source_sync', r.id))
+    return c.json(jobs as any, 202)
+  },
 )
 
 app.openapi(

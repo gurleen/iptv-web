@@ -97,3 +97,27 @@ describe('xmltv', () => {
     expect(chans).toEqual(['a'])
   })
 })
+
+describe('xmltv performance', () => {
+  it('parses a large guide in linear time', async () => {
+    const parts = ['<tv>']
+    for (let c = 0; c < 500; c++) parts.push(`<channel id="c${c}"><display-name>C${c}</display-name></channel>`)
+    for (let i = 0; i < 100_000; i++) {
+      parts.push(`<programme start="20261117180000 +0000" stop="20261117190000 +0000" channel="c${i % 500}"><title>Show ${i}</title><desc>Some description text for the programme number ${i}</desc></programme>`)
+    }
+    parts.push('</tv>')
+    const bytes = new TextEncoder().encode(parts.join('\n'))
+    const stream = new ReadableStream<Uint8Array>({
+      start(ctl) {
+        for (let i = 0; i < bytes.length; i += 65536) ctl.enqueue(bytes.slice(i, i + 65536))
+        ctl.close()
+      },
+    })
+    let n = 0
+    const t0 = performance.now()
+    await parseXmltv(stream, { wantProgramme: (id) => id === 'c1', programme: () => void n++ })
+    const ms = performance.now() - t0
+    expect(n).toBe(200)
+    expect(ms).toBeLessThan(3000) // ~19MB; was quadratic before
+  })
+})
