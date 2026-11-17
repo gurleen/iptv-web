@@ -1,7 +1,8 @@
 import { z } from '@hono/zod-openapi'
 import { loadEvents, loadOutputChannels } from '../../output/lineup'
+import { resolvePlayback } from '../../output/playback'
 import { epgDays } from '../../sync/epg'
-import { newRouter, route, valid } from '../hono'
+import { HttpError, IdParam, newRouter, route, valid } from '../hono'
 
 const T = ['Guide viewer']
 const app = newRouter()
@@ -136,6 +137,29 @@ app.openapi(
           : (eventsByChannel.get(ch.id) ?? []).sort((a, b) => a.start - b.start),
       })),
     })
+  },
+)
+
+app.openapi(
+  route({
+    method: 'get',
+    path: '/viewer/channels/{id}/play',
+    tags: T,
+    summary: 'Resolve a browser-playable URL for a lineup channel (used by the web player)',
+    description:
+      'Follows the provider redirect chain (via Browser Rendering for browser-mode sources) without downloading video, and returns the final CDN URL upgraded to https. secure=false means only an http URL exists, which an https page cannot play.',
+    params: IdParam,
+    query: z.object({ format: z.enum(['hls', 'ts']).optional().openapi({ description: 'Default hls' }) }),
+    response: z.object({ url: z.string(), format: z.enum(['hls', 'ts']), secure: z.boolean(), channelName: z.string() }),
+  }),
+  async (c) => {
+    const { id } = valid(c, 'param') as { id: string }
+    const { format } = valid(c, 'query') as { format?: 'hls' | 'ts' }
+    try {
+      return c.json(await resolvePlayback(c.env, id, format ?? 'hls'))
+    } catch (e) {
+      throw new HttpError(502, e instanceof Error ? e.message : String(e))
+    }
   },
 )
 

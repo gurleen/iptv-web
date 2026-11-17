@@ -1,8 +1,9 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ChevronLeft, ChevronRight, Clock, Trophy } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, Play, Trophy } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Empty, PageHeader } from '@/components/app/page-header'
+import { Player } from '@/components/app/player'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -75,6 +76,7 @@ function Guide() {
   const now = useNow()
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<{ p: Programme; ch: GuideChannel } | null>(null)
+  const [playing, setPlaying] = useState<GuideChannel | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const narrow = useNarrow()
   const LEFT = narrow ? 120 : 220 // channel column width
@@ -190,15 +192,30 @@ function Guide() {
                 )}
                 {channels.map((ch) => (
                   <div key={ch.id} className="flex border-b last:border-b-0" style={{ height: ROW }}>
-                    <div style={{ width: LEFT }} className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r bg-background px-2">
-                      <span className="w-7 shrink-0 text-right text-xs text-muted-foreground tabular-nums sm:w-9">{ch.number ?? ''}</span>
+                    <button
+                      type="button"
+                      onClick={() => setPlaying(ch)}
+                      title={`Watch ${ch.name}`}
+                      style={{ width: LEFT }}
+                      className={cn(
+                        'group sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r bg-background px-2 text-left hover:bg-accent',
+                        playing?.id === ch.id && 'bg-accent',
+                      )}
+                    >
+                      <span className="relative w-7 shrink-0 text-right text-xs text-muted-foreground tabular-nums sm:w-9">
+                        <span className={cn('group-hover:invisible', playing?.id === ch.id && 'invisible')}>{ch.number ?? ''}</span>
+                        <Play
+                          className={cn(
+                            'absolute top-1/2 right-0 size-4 -translate-y-1/2 fill-current text-foreground',
+                            playing?.id === ch.id ? 'visible text-red-500' : 'invisible group-hover:visible',
+                          )}
+                        />
+                      </span>
                       <div className="hidden size-9 shrink-0 items-center justify-center overflow-hidden rounded bg-muted/50 sm:flex">
                         {ch.logo ? <img src={ch.logo} alt="" className="max-h-full max-w-full object-contain" loading="lazy" /> : null}
                       </div>
-                      <span className="min-w-0 truncate text-sm font-medium" title={ch.name}>
-                        {ch.name}
-                      </span>
-                    </div>
+                      <span className="min-w-0 truncate text-sm font-medium">{ch.name}</span>
+                    </button>
                     <div className="relative" style={{ width }}>
                       {ch.programmes.length === 0 && (
                         <div className="absolute inset-y-1 left-1 right-1 flex items-center rounded-md border border-dashed text-xs text-muted-foreground">
@@ -242,7 +259,7 @@ function Guide() {
             </div>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Entries with an amber edge come from events. Guide data is only stored for channels mapped to an EPG source.
+            Click a channel to watch it. Entries with an amber edge come from events. Guide data is only stored for channels mapped to an EPG source.
           </p>
         </>
       )}
@@ -272,10 +289,27 @@ function Guide() {
               {selected.p.subtitle && <p className="font-medium">{selected.p.subtitle}</p>}
               {selected.p.icon && <img src={selected.p.icon} alt="" className="max-h-48 rounded-md" />}
               <p className="whitespace-pre-line text-muted-foreground">{selected.p.description ?? 'No description.'}</p>
+              <Button
+                onClick={() => {
+                  setPlaying(selected.ch)
+                  setSelected(null)
+                }}
+              >
+                <Play className="fill-current" /> Watch {selected.ch.name}
+              </Button>
             </div>
           </DialogContent>
         )}
       </Dialog>
+
+      {playing && (
+        <Player
+          key={playing.id}
+          channel={playing}
+          nowTitle={playing.programmes.find((p) => now >= p.start && now < p.stop)?.title}
+          onClose={() => setPlaying(null)}
+        />
+      )}
     </>
   )
 }
