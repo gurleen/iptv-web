@@ -1,4 +1,5 @@
 import { bumpVersion, jsonChunks } from '../db'
+import { describeHttpError, fetchUpstream } from '../lib/http-errors'
 import { parseXmltv, type XmltvChannel, type XmltvProgramme } from '../lib/xmltv'
 import { clientFor, getSourceRow } from './sources'
 
@@ -27,6 +28,12 @@ async function resolveUrl(env: Env, row: EpgSourceRow) {
   return { url: row.url, userAgent: null }
 }
 
+/** Values in the URL that must not be echoed back (Xtream creds live in the query string). */
+function secretsIn(url: string) {
+  const u = new URL(url)
+  return [u.username, u.password, ...u.searchParams.values()].filter((v) => v && v.length >= 3)
+}
+
 export type EpgSyncResult = { epgSourceId: string; ok: boolean; channels?: number; programmes?: number; error?: string }
 
 /**
@@ -39,8 +46,9 @@ export async function syncEpgSource(env: Env, epgSourceId: string): Promise<EpgS
   const started = Date.now()
   try {
     const { url, userAgent } = await resolveUrl(env, row)
-    const res = await fetch(url, { headers: { 'user-agent': userAgent || 'Mozilla/5.0 iptv-web', accept: '*/*' } })
-    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+    const res = await fetchUpstream('EPG download', url, { headers: { 'user-agent': userAgent || 'Mozilla/5.0 iptv-web', accept: '*/*' } })
+    if (!res.ok) throw await describeHttpError('EPG download', url, res, secretsIn(url))
+    if (!res.body) throw new Error('EPG download returned an empty body')
 
     const { results: mapped } = await env.DB.prepare(
       'SELECT DISTINCT epg_channel_id AS id FROM lineup_channels WHERE epg_source_id = ? AND epg_channel_id IS NOT NULL',

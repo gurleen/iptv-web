@@ -1,3 +1,5 @@
+import { describeHttpError, fetchUpstream } from './http-errors'
+
 /** Minimal Xtream Codes player_api client (live TV only). */
 
 export type XtreamCreds = {
@@ -66,13 +68,20 @@ export class XtreamClient {
   }
 
   private async get<T>(action?: string, extra?: Record<string, string>): Promise<T> {
-    const res = await fetch(this.apiUrl(action, extra), { headers: this.headers() })
-    if (!res.ok) throw new Error(`Xtream ${action ?? 'auth'} failed: HTTP ${res.status}`)
+    const label = `Xtream ${action ?? 'login'}`
+    const url = this.apiUrl(action, extra)
+    const res = await fetchUpstream(label, url, { headers: this.headers() })
+    if (!res.ok) throw await describeHttpError(label, url, res, [this.creds.username, this.creds.password])
     const text = await res.text()
     try {
       return JSON.parse(text) as T
     } catch {
-      throw new Error(`Xtream ${action ?? 'auth'} returned non-JSON: ${text.slice(0, 120)}`)
+      let snippet = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
+      for (const s of [this.creds.username, this.creds.password]) snippet = snippet.split(s).join('***')
+      throw new Error(
+        `${label} returned non-JSON (HTTP ${res.status}, server: ${res.headers.get('server') ?? 'n/a'}): "${snippet}". ` +
+          'This is often a block/landing page served to datacenter IPs, or a wrong server URL.',
+      )
     }
   }
 
