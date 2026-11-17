@@ -52,6 +52,24 @@ These need an output-scope token. Create one under Settings → API tokens.
 - `/api/output/lineup.json` and `/api/output/events.json`: for downstream apps.
 - `/stream/<channelId>.ts`: redirects to the first working upstream stream, so provider credentials never appear in the playlist.
 
+## MCP server
+
+`/mcp` is a stateless Streamable HTTP MCP server with 32 tools covering lineup cleanup, EPG mapping, events and rules. Authenticate with an admin token.
+
+Claude Code:
+
+```bash
+claude mcp add --transport http iptv https://<your-worker>/mcp --header "Authorization: Bearer <admin token>"
+```
+
+Claude Desktop and other clients that take JSON config:
+
+```json
+{ "mcpServers": { "iptv": { "type": "http", "url": "https://<your-worker>/mcp", "headers": { "Authorization": "Bearer <admin token>" } } } }
+```
+
+The tools call the REST API internally, so they behave exactly like the endpoints below. Adding or editing sources (credentials) is left to the UI on purpose.
+
 ## API for agents
 
 - Guide: `GET /api/guide` (markdown, written for agents)

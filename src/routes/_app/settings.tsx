@@ -151,6 +151,27 @@ function Settings() {
 
         <Card>
           <CardHeader>
+            <CardTitle>MCP server</CardTitle>
+            <CardDescription>Connect an agent (Claude Code, Claude Desktop, …) with an admin token.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {[
+              ['Claude Code', `claude mcp add --transport http iptv ${origin}/mcp --header "Authorization: Bearer <ADMIN_TOKEN>"`],
+              ['JSON config', JSON.stringify({ mcpServers: { iptv: { type: 'http', url: `${origin}/mcp`, headers: { Authorization: 'Bearer <ADMIN_TOKEN>' } } } })],
+            ].map(([label, text]) => (
+              <div key={label} className="flex items-center gap-2 text-sm">
+                <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
+                <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs">{text}</code>
+                <Button size="icon" variant="ghost" onClick={() => copy(text)}>
+                  <Copy />
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Backup</CardTitle>
             <CardDescription>Export categories, channels, streams, events and rules as JSON. Restore with POST /api/lineup/import.</CardDescription>
           </CardHeader>

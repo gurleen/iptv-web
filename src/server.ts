@@ -2,7 +2,7 @@ import handler from '@tanstack/react-start/server-entry'
 import { app } from './server/api/app'
 import { handleScheduled } from './server/jobs'
 
-const WORKER_PATHS = /^\/(api\/|playlist\.m3u$|events\.m3u$|epg\.xml(\.gz)?$|stream\/)/
+const WORKER_PATHS = /^\/(api\/|mcp$|playlist\.m3u$|events\.m3u$|epg\.xml(\.gz)?$|stream\/)/
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {

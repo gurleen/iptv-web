@@ -2,6 +2,7 @@ export const AGENT_GUIDE = `# IPTV Web — agent guide
 
 Base URL: {{BASE}}/api  ·  OpenAPI: {{BASE}}/api/openapi.json  ·  Swagger UI: {{BASE}}/api/docs
 Auth: \`Authorization: Bearer <admin token>\` (create one in Settings → API tokens, or POST /api/tokens).
+MCP: the same operations are available as MCP tools at {{BASE}}/mcp (Streamable HTTP, same bearer token).
 
 ## Mental model
 - **Sources** are Xtream Codes providers. Syncing pulls their live channels into **source channels**

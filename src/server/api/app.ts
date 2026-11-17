@@ -4,6 +4,7 @@ import { authenticate } from '../lib/auth'
 import { baseUrl } from '../output/lineup'
 import { buildM3u } from '../output/m3u'
 import { getOutputXmltv } from '../output/xmltv'
+import { handleMcp } from '../mcp'
 import { clientFor } from '../sync/sources'
 import { AGENT_GUIDE } from './guide'
 import { HttpError, newRouter, type AppEnv } from './hono'
@@ -59,6 +60,33 @@ app.onError((err, c) => {
 
 app.route('/api', api)
 app.all('/api/*', (c) => c.json({ error: 'not found' }, 404))
+
+// --- MCP (Streamable HTTP, stateless). Auth: Authorization: Bearer <admin token> ---
+app.all('/mcp', async (c) => {
+  const auth = await authenticate(c.env, c.req.raw)
+  if (!auth) return c.json({ error: 'unauthorized' }, 401, { 'www-authenticate': 'Bearer' })
+  if (auth.scope !== 'admin') return c.json({ error: 'admin token required' }, 403)
+  const authorization = c.req.header('authorization')
+  const cookie = c.req.header('cookie')
+  const origin = new URL(c.req.url).origin
+  return handleMcp(c.req.raw, async (method, path, body) => {
+    const headers: Record<string, string> = {}
+    if (authorization) headers.authorization = authorization
+    if (cookie) headers.cookie = cookie
+    if (body !== undefined) headers['content-type'] = 'application/json'
+    const res = await app.fetch(
+      new Request(`${origin}/api${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }),
+      c.env,
+      c.executionCtx,
+    )
+    const text = await res.text()
+    let data: unknown = text
+    try {
+      data = text ? JSON.parse(text) : null
+    } catch {}
+    return { status: res.status, data }
+  })
+})
 
 // --- player-facing outputs (output or admin scope; ?token= works for players) ---
 const requireOutput = async (c: any, next: () => Promise<void>) => {
