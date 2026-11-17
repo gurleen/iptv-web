@@ -50,34 +50,37 @@ function Epg() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Channels</TableHead>
-              <TableHead>Stored programmes</TableHead>
+              <TableHead className="hidden md:table-cell">Type</TableHead>
+              <TableHead className="hidden md:table-cell">Channels</TableHead>
+              <TableHead className="hidden md:table-cell">Stored programmes</TableHead>
               <TableHead>Last refresh</TableHead>
-              <TableHead>Enabled</TableHead>
+              <TableHead className="hidden md:table-cell">Enabled</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {list.data?.map((e) => (
               <TableRow key={e.id}>
-                <TableCell className="font-medium">
-                  {e.name}
-                  {e.url && <div className="max-w-72 truncate text-xs text-muted-foreground">{e.url}</div>}
+                <TableCell className="max-w-0 font-medium md:max-w-none">
+                  <div className="truncate md:whitespace-normal">{e.name}</div>
+                  {e.url && <div className="max-w-72 truncate text-xs font-normal text-muted-foreground">{e.url}</div>}
+                  <div className="text-xs font-normal text-muted-foreground md:hidden">
+                    {e.channelCount?.toLocaleString() ?? 0} channels · {e.programmeCount?.toLocaleString() ?? 0} programmes{e.enabled ? '' : ' · disabled'}
+                  </div>
                 </TableCell>
-                <TableCell>
+                <TableCell className="hidden md:table-cell">
                   <Badge variant="outline">{e.type === 'xtream' ? 'Provider' : 'XMLTV'}</Badge>
                 </TableCell>
-                <TableCell className="tabular-nums">{e.channelCount?.toLocaleString() ?? '—'}</TableCell>
-                <TableCell className="tabular-nums">{e.programmeCount?.toLocaleString() ?? '—'}</TableCell>
+                <TableCell className="tabular-nums hidden md:table-cell">{e.channelCount?.toLocaleString() ?? '—'}</TableCell>
+                <TableCell className="tabular-nums hidden md:table-cell">{e.programmeCount?.toLocaleString() ?? '—'}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Badge variant={e.lastSyncStatus === 'error' ? 'destructive' : 'secondary'}>{e.lastSyncStatus ?? 'pending'}</Badge>
                     <span className="text-xs text-muted-foreground">{fmtAgo(e.lastSyncAt)}</span>
                   </div>
-                  {e.lastSyncError && <p className="mt-1 max-w-64 truncate text-xs text-destructive">{e.lastSyncError}</p>}
+                  {e.lastSyncError && <p className="mt-1 max-w-40 truncate text-xs text-destructive md:max-w-64">{e.lastSyncError}</p>}
                 </TableCell>
-                <TableCell>
+                <TableCell className="hidden md:table-cell">
                   <Switch checked={e.enabled} onCheckedChange={(v) => toggle.mutate({ id: e.id, enabled: v })} />
                 </TableCell>
                 <TableCell className="text-right whitespace-nowrap">

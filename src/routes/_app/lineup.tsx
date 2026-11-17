@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowDown, ArrowUp, ChevronDown, Eye, EyeOff, Lock, Pencil, Plus, Trash2, Tv2, Wand2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, FolderCog, Eye, EyeOff, Lock, Pencil, Plus, Trash2, Tv2, Wand2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { ConfirmButton } from '@/components/app/confirm'
@@ -12,6 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useMutate } from '@/hooks/use-mutate'
@@ -36,6 +38,7 @@ function Lineup() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<LineupChannel | 'new' | null>(null)
   const [tool, setTool] = useState<'rename' | 'renumber' | null>(null)
+  const [catsOpen, setCatsOpen] = useState(false)
 
   useEffect(() => setOffset(0), [categoryId, q, noEpg, broken])
 
@@ -94,11 +97,48 @@ function Lineup() {
       </PageHeader>
 
       <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-        <CategoryList cats={cats.data ?? []} value={categoryId} onChange={setCategoryId} />
+        <div className="hidden lg:block">
+          <CategoryList cats={cats.data ?? []} value={categoryId} onChange={setCategoryId} />
+        </div>
 
         <div className="min-w-0">
+          {/* phones/tablets: category picker + a panel for managing categories */}
+          <div className="mb-3 flex gap-2 lg:hidden">
+            <Select value={categoryId ?? '__all'} onValueChange={(v) => setCategoryId(v === '__all' ? undefined : v)}>
+              <SelectTrigger className="min-w-0 flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all">All channels</SelectItem>
+                <SelectItem value="none">Uncategorized</SelectItem>
+                {cats.data?.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name} ({c.channelCount})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => setCatsOpen(true)}>
+              <FolderCog /> Categories
+            </Button>
+          </div>
+          <Sheet open={catsOpen} onOpenChange={setCatsOpen}>
+            <SheetContent side="left" className="w-72 overflow-y-auto p-4">
+              <SheetTitle className="mb-2">Categories</SheetTitle>
+              <CategoryList
+                cats={cats.data ?? []}
+                value={categoryId}
+                onChange={(v) => {
+                  setCategoryId(v)
+                  setCatsOpen(false)
+                }}
+                touch
+              />
+            </SheetContent>
+          </Sheet>
+
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Input className="w-56" placeholder="Filter by name…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Input className="w-full sm:w-56" placeholder="Filter by name…" value={q} onChange={(e) => setQ(e.target.value)} />
             <label className="flex items-center gap-2 text-sm">
               <Switch checked={noEpg} onCheckedChange={setNoEpg} /> No EPG
             </label>
@@ -160,12 +200,12 @@ function Lineup() {
                         }
                       />
                     </TableHead>
-                    <TableHead className="w-20">#</TableHead>
-                    <TableHead className="w-10" />
+                    <TableHead className="w-14 md:w-20">#</TableHead>
+                    <TableHead className="w-10 hidden md:table-cell" />
                     <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>EPG</TableHead>
-                    <TableHead>Streams</TableHead>
+                    <TableHead className="hidden md:table-cell">Category</TableHead>
+                    <TableHead className="hidden md:table-cell">EPG</TableHead>
+                    <TableHead className="hidden md:table-cell">Streams</TableHead>
                     <TableHead className="w-12">On</TableHead>
                     <TableHead />
                   </TableRow>
@@ -180,25 +220,30 @@ function Lineup() {
                         </TableCell>
                         <TableCell>
                           <InlineEdit
-                            className="w-16 tabular-nums"
+                            className="w-11 tabular-nums md:w-16"
                             value={ch.number == null ? '' : String(ch.number)}
                             onSave={(v) => patch.mutate({ id: ch.id, patch: { number: v === '' ? null : Number(v) } })}
                           />
                         </TableCell>
-                        <TableCell>{ch.logo ? <img src={ch.logo} alt="" className="size-6 object-contain" loading="lazy" /> : null}</TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">{ch.logo ? <img src={ch.logo} alt="" className="size-6 object-contain" loading="lazy" /> : null}</TableCell>
+                        <TableCell className="max-w-0 md:max-w-none">
                           <div className="flex items-center gap-1.5">
-                            <InlineEdit className="min-w-48" value={ch.name} onSave={(v) => v && patch.mutate({ id: ch.id, patch: { name: v } })} />
+                            <InlineEdit className="w-full min-w-0 md:min-w-48" value={ch.name} onSave={(v) => v && patch.mutate({ id: ch.id, patch: { name: v } })} />
                             {ch.kind === 'event' && (
                               <Badge variant="outline" title={ch.hideWhenIdle ? 'Hidden when no event' : undefined}>
                                 event
                               </Badge>
                             )}
-                            {ch.locked && <Lock className="size-3 text-muted-foreground" />}
+                            {ch.locked && <Lock className="size-3 shrink-0 text-muted-foreground" />}
+                          </div>
+                          <div className="truncate px-1 text-xs text-muted-foreground md:hidden">
+                            {ch.categoryName ?? 'Uncategorized'}
+                            {!ch.epgChannelId && ' · no EPG'}
+                            {live < ch.streams.length && <span className="text-destructive"> · {ch.streams.length - live} broken</span>}
                           </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{ch.categoryName ?? '—'}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-muted-foreground hidden md:table-cell">{ch.categoryName ?? '—'}</TableCell>
+                        <TableCell className="hidden md:table-cell">
                           {ch.epgChannelId ? (
                             <span className="block max-w-36 truncate font-mono text-xs" title={ch.epgChannelId}>
                               {ch.epgChannelId}
@@ -207,7 +252,7 @@ function Lineup() {
                             <span className="text-xs text-muted-foreground">none</span>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <Badge variant={live ? 'secondary' : 'destructive'}>
                             {live}/{ch.streams.length}
                           </Badge>
@@ -255,7 +300,7 @@ function InlineEdit({ value, onSave, className }: { value: string; onSave: (v: s
   )
 }
 
-function CategoryList({ cats, value, onChange }: { cats: Category[]; value?: string; onChange: (v?: string) => void }) {
+function CategoryList({ cats, value, onChange, touch }: { cats: Category[]; value?: string; onChange: (v?: string) => void; touch?: boolean }) {
   const [name, setName] = useState('')
   const create = useMutate(() => api('/lineup/categories', { body: { name } }), { invalidate: INV, onSuccess: () => setName('') })
   const reorder = useMutate((ids: string[]) => api('/lineup/categories/reorder', { body: { ids } }), { invalidate: INV })
@@ -285,7 +330,7 @@ function CategoryList({ cats, value, onChange }: { cats: Category[]; value?: str
           <button className="min-w-0 flex-1 truncate text-left" onClick={() => onChange(c.id)}>
             {c.name} <span className="text-xs text-muted-foreground">{c.channelCount}</span>
           </button>
-          <span className="hidden shrink-0 gap-0.5 group-hover:flex">
+          <span className={cn('shrink-0 gap-0.5 group-hover:flex', touch ? 'flex gap-2.5' : 'hidden')}>
             <ArrowUp className="size-3.5 cursor-pointer" onClick={() => move(i, -1)} />
             <ArrowDown className="size-3.5 cursor-pointer" onClick={() => move(i, 1)} />
             {c.hidden ? (
@@ -346,7 +391,7 @@ function RenameDialog({ ids, onClose }: { ids: string[]; onClose: () => void }) 
         <DialogHeader>
           <DialogTitle>Find & replace in {ids.length ? `${ids.length} selected` : 'all'} channel names</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Input placeholder="Regex, e.g. \s*\(east\)$" value={pattern} onChange={(e) => setPattern(e.target.value)} className="font-mono" />
           <Input placeholder="Replacement ($1 ok)" value={replacement} onChange={(e) => setReplacement(e.target.value)} className="font-mono" />
         </div>

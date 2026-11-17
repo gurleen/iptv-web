@@ -47,9 +47,9 @@ function Sources() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Server</TableHead>
-                <TableHead>Channels</TableHead>
-                <TableHead>Account</TableHead>
+                <TableHead className="hidden md:table-cell">Server</TableHead>
+                <TableHead className="hidden md:table-cell">Channels</TableHead>
+                <TableHead className="hidden md:table-cell">Account</TableHead>
                 <TableHead>Last sync</TableHead>
                 <TableHead />
               </TableRow>
@@ -60,17 +60,18 @@ function Sources() {
                 const exp = info.exp_date ? new Date(Number(info.exp_date) * 1000).toLocaleDateString() : null
                 return (
                   <TableRow key={s.id} className={s.enabled ? '' : 'opacity-50'}>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium whitespace-normal">
                       {s.name}
                       {s.fetchMode === 'browser' && (
                         <Badge variant="outline" className="ml-2" title="API and EPG calls go through Cloudflare Browser Rendering">
                           via browser
                         </Badge>
                       )}
+                      <div className="text-xs font-normal text-muted-foreground md:hidden">{s.channelCount?.toLocaleString()} channels</div>
                     </TableCell>
-                    <TableCell className="max-w-48 truncate text-muted-foreground">{s.baseUrl}</TableCell>
-                    <TableCell className="tabular-nums">{s.channelCount?.toLocaleString()}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="max-w-48 truncate text-muted-foreground hidden md:table-cell">{s.baseUrl}</TableCell>
+                    <TableCell className="tabular-nums hidden md:table-cell">{s.channelCount?.toLocaleString()}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
                       {info.status ?? '—'}
                       {info.max_connections ? ` · ${info.active_cons ?? 0}/${info.max_connections} conn` : ''}
                       {exp ? ` · exp ${exp}` : ''}
@@ -82,7 +83,7 @@ function Sources() {
                         </Badge>
                         <span className="text-xs text-muted-foreground">{fmtAgo(s.lastSyncAt)}</span>
                       </div>
-                      {s.lastSyncError && <p className="mt-1 max-w-64 truncate text-xs text-destructive">{s.lastSyncError}</p>}
+                      {s.lastSyncError && <p className="mt-1 max-w-40 truncate text-xs text-destructive md:max-w-64">{s.lastSyncError}</p>}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       <Button
@@ -171,7 +172,7 @@ function SourceDialog({ id, initial, onClose, onCreated }: { id?: string; initia
           <Field label="Server URL">
             <Input value={f.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} placeholder="http://line.provider.tv:8080" />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Username">
               <Input value={f.username} onChange={(e) => set('username', e.target.value)} autoComplete="off" />
             </Field>
@@ -179,7 +180,7 @@ function SourceDialog({ id, initial, onClose, onCreated }: { id?: string; initia
               <Input type="password" value={f.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" />
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Stream format">
               <Select value={f.streamFormat} onValueChange={(v) => set('streamFormat', v as 'ts' | 'm3u8')}>
                 <SelectTrigger className="w-full">

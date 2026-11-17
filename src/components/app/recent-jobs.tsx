@@ -28,12 +28,12 @@ export function RecentJobs({ names }: { names: Record<string, string> }) {
           const secs = j.startedAt ? Math.round(((j.finishedAt ?? Date.now()) - j.startedAt) / 1000) : null
           return (
             <div key={j.id} className="flex items-center gap-2">
-              <span className="w-28 shrink-0">{LABEL[j.type]}</span>
+              <span className="w-24 shrink-0 sm:w-28">{LABEL[j.type]}</span>
               <span className="min-w-0 flex-1 truncate text-muted-foreground" title={j.error ?? undefined}>
                 {j.targetId && j.targetId !== 'full' ? (names[j.targetId] ?? j.targetId) : 'all'}
                 {j.error ? ` — ${j.error}` : ''}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="hidden text-xs text-muted-foreground sm:inline">
                 {fmtAgo(j.createdAt)}
                 {secs != null ? ` · ${secs}s` : ''}
               </span>

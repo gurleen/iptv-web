@@ -78,7 +78,7 @@ export function ChannelDialog({ channel, categories, onClose }: { channel: Lineu
           </TabsList>
 
           <TabsContent value="details" className="grid gap-3 pt-2">
-            <div className="grid grid-cols-[1fr_100px] gap-3">
+            <div className="grid grid-cols-[1fr_88px] gap-3">
               <Field label="Name">
                 <Input value={f.name} onChange={(e) => set('name', e.target.value)} />
               </Field>
@@ -86,7 +86,7 @@ export function ChannelDialog({ channel, categories, onClose }: { channel: Lineu
                 <Input type="number" value={f.number} onChange={(e) => set('number', e.target.value)} />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Category">
                 <Select value={f.categoryId} onValueChange={(v) => set('categoryId', v)}>
                   <SelectTrigger className="w-full">

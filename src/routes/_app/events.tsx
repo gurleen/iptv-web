@@ -75,18 +75,22 @@ function EventList() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>When</TableHead>
+                <TableHead className="hidden md:table-cell">When</TableHead>
                 <TableHead>Event</TableHead>
-                <TableHead>Channels</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">Channels</TableHead>
+                <TableHead className="hidden md:table-cell">Status</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
               {list.data?.items.map((e) => (
                 <TableRow key={e.id} className={e.hidden ? 'opacity-50' : ''}>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">{e.startsAt ? fmtTime(e.startsAt) : 'TBA'}</TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground hidden md:table-cell">{e.startsAt ? fmtTime(e.startsAt) : 'TBA'}</TableCell>
+                  <TableCell className="whitespace-normal">
+                    <div className="mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground md:hidden">
+                      <Badge variant={STATUS_VARIANT[e.status]}>{e.status}</Badge>
+                      {e.startsAt ? fmtTime(e.startsAt) : 'TBA'}
+                    </div>
                     <div className="flex items-center gap-1.5 font-medium">
                       {e.title}
                       {e.locked && e.origin === 'rule' && <Lock className="size-3 text-muted-foreground" />}
@@ -94,12 +98,13 @@ function EventList() {
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {[e.sport, e.league, e.origin === 'rule' ? 'auto' : null].filter(Boolean).join(' · ')}
+                      <span className="md:hidden">{e.channels.length ? ` · ${e.channels.map((c) => c.name).join(', ')}` : ''}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="text-sm hidden md:table-cell">
                     {e.channels.map((c) => c.name).join(', ') || <span className="text-muted-foreground">none</span>}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <Badge variant={STATUS_VARIANT[e.status]}>{e.status}</Badge>
                   </TableCell>
                   <TableCell className="text-right whitespace-nowrap">
@@ -179,7 +184,7 @@ function EventDialog({ event, onClose }: { event: Event | null; onClose: () => v
           <Field label="Title">
             <Input value={f.title} onChange={(e) => set('title', e.target.value)} placeholder="UFC 310: Pantoja vs Asakura" />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Sport">
               <Input value={f.sport} onChange={(e) => set('sport', e.target.value)} placeholder="MMA" />
             </Field>
@@ -284,9 +289,9 @@ function RuleList() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Matches</TableHead>
-                <TableHead>Pattern</TableHead>
-                <TableHead>Last run</TableHead>
+                <TableHead className="hidden md:table-cell">Matches</TableHead>
+                <TableHead className="hidden md:table-cell">Pattern</TableHead>
+                <TableHead className="hidden md:table-cell">Last run</TableHead>
                 <TableHead>On</TableHead>
                 <TableHead />
               </TableRow>
@@ -294,13 +299,16 @@ function RuleList() {
             <TableBody>
               {rules.data?.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium whitespace-normal">
                     {r.name}
-                    <div className="text-xs text-muted-foreground">{r.kind === 'source_channel' ? 'Upstream channel names' : 'Guide programmes'}</div>
+                    <div className="text-xs font-normal text-muted-foreground">
+                      {r.kind === 'source_channel' ? 'Upstream channel names' : 'Guide programmes'}
+                      <span className="md:hidden"> · {r.lastRunMatches ?? 0} matches · ran {fmtAgo(r.lastRunAt)}</span>
+                    </div>
                   </TableCell>
-                  <TableCell className="tabular-nums">{r.lastRunMatches ?? '—'}</TableCell>
-                  <TableCell className="max-w-64 truncate font-mono text-xs">{r.pattern}</TableCell>
-                  <TableCell className="text-muted-foreground">{fmtAgo(r.lastRunAt)}</TableCell>
+                  <TableCell className="tabular-nums hidden md:table-cell">{r.lastRunMatches ?? '—'}</TableCell>
+                  <TableCell className="max-w-64 truncate font-mono text-xs hidden md:table-cell">{r.pattern}</TableCell>
+                  <TableCell className="text-muted-foreground hidden md:table-cell">{fmtAgo(r.lastRunAt)}</TableCell>
                   <TableCell>
                     <Switch checked={r.enabled} onCheckedChange={(v) => toggle.mutate({ id: r.id, enabled: v })} />
                   </TableCell>
@@ -371,7 +379,7 @@ function RuleDialog({ rule, onClose }: { rule: Rule | null; onClose: () => void 
           <DialogTitle>{rule ? 'Edit rule' : 'New event rule'}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Name">
               <Input value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="PPV events" />
             </Field>
@@ -398,7 +406,7 @@ function RuleDialog({ rule, onClose }: { rule: Rule | null; onClose: () => void 
               placeholder={f.kind === 'source_channel' ? '^PPV\\s*\\d+\\s*[:|]\\s*(?<title>.+)' : '^(NFL|NBA|NHL)\\b.*\\b(vs\\.?|at|@)\\b'}
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {f.kind === 'source_channel' && (
               <Field label="Upstream category must match (regex)">
                 <Input className="font-mono" value={f.categoryPattern} onChange={(e) => set('categoryPattern', e.target.value)} placeholder="PPV|Events" />

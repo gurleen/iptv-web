@@ -80,9 +80,9 @@ function Browse() {
       </PageHeader>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Input className="w-64" placeholder="Search names… (* = wildcard)" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Input className="w-full sm:w-64" placeholder="Search names… (* = wildcard)" value={q} onChange={(e) => setQ(e.target.value)} />
         <Select value={sourceId} onValueChange={(v) => (setSourceId(v), setCategory(ALL))}>
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-full sm:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -95,7 +95,7 @@ function Browse() {
           </SelectContent>
         </Select>
         <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-64">
+          <SelectTrigger className="w-full sm:w-64">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="max-h-96">
@@ -133,11 +133,11 @@ function Browse() {
                   }
                 />
               </TableHead>
-              <TableHead className="w-10" />
+              <TableHead className="w-10 hidden md:table-cell" />
               <TableHead>Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>EPG id</TableHead>
+              <TableHead className="hidden md:table-cell">Category</TableHead>
+              <TableHead className="hidden md:table-cell">Source</TableHead>
+              <TableHead className="hidden md:table-cell">EPG id</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -147,11 +147,16 @@ function Browse() {
                 <TableCell>
                   <Checkbox checked={selected.has(c.id)} onClick={(e) => e.stopPropagation()} onCheckedChange={() => toggle(c.id)} />
                 </TableCell>
-                <TableCell>{c.logo ? <img src={c.logo} alt="" className="size-6 object-contain" loading="lazy" /> : null}</TableCell>
-                <TableCell className="font-medium">{c.name}</TableCell>
-                <TableCell className="text-muted-foreground">{c.categoryName}</TableCell>
-                <TableCell className="text-muted-foreground">{c.sourceName}</TableCell>
-                <TableCell className="max-w-40 truncate font-mono text-xs text-muted-foreground">{c.epgChannelId}</TableCell>
+                <TableCell className="hidden md:table-cell">{c.logo ? <img src={c.logo} alt="" className="size-6 object-contain" loading="lazy" /> : null}</TableCell>
+                <TableCell className="font-medium whitespace-normal">
+                  {c.name}
+                  <div className="text-xs font-normal text-muted-foreground md:hidden">
+                    {[c.categoryName, c.sourceName].filter(Boolean).join(' · ')}
+                  </div>
+                </TableCell>
+                <TableCell className="text-muted-foreground hidden md:table-cell">{c.categoryName}</TableCell>
+                <TableCell className="text-muted-foreground hidden md:table-cell">{c.sourceName}</TableCell>
+                <TableCell className="max-w-40 truncate font-mono text-xs text-muted-foreground hidden md:table-cell">{c.epgChannelId}</TableCell>
                 <TableCell>
                   {c.lineupChannelIds.length > 0 && (
                     <Badge variant="secondary">

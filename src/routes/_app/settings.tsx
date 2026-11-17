@@ -51,7 +51,7 @@ function Settings() {
   return (
     <>
       <PageHeader title="Settings" />
-      <div className="grid gap-6">
+      <div className="grid min-w-0 gap-6 [&>*]:min-w-0">
         <Card>
           <CardHeader>
             <CardTitle>Output URLs</CardTitle>
@@ -63,8 +63,8 @@ function Settings() {
           <CardContent className="space-y-2">
             <Input placeholder="Output token" value={outputToken} onChange={(e) => setOutputToken(e.target.value)} className="font-mono" />
             {urls.map(([label, url]) => (
-              <div key={label} className="flex items-center gap-2 text-sm">
-                <span className="w-40 shrink-0 text-muted-foreground">{label}</span>
+              <div key={label} className="grid grid-cols-[1fr_auto] items-center gap-x-2 text-sm sm:flex">
+                <span className="col-span-2 text-xs text-muted-foreground sm:w-40 sm:shrink-0 sm:text-sm">{label}</span>
                 <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs">{url}</code>
                 <Button size="icon" variant="ghost" onClick={() => copy(url)}>
                   <Copy />
@@ -91,7 +91,7 @@ function Settings() {
                 create.mutate(undefined)
               }}
             >
-              <Input className="w-60" placeholder="Token name (e.g. TiviMate, Claude)" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input className="w-full sm:w-60" placeholder="Token name (e.g. TiviMate, Claude)" value={name} onChange={(e) => setName(e.target.value)} />
               <Select value={scope} onValueChange={(v) => setScope(v as 'output' | 'admin')}>
                 <SelectTrigger className="w-32">
                   <SelectValue />
@@ -121,8 +121,8 @@ function Settings() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Scope</TableHead>
-                  <TableHead>Token</TableHead>
-                  <TableHead>Last used</TableHead>
+                  <TableHead className="hidden md:table-cell">Token</TableHead>
+                  <TableHead className="hidden md:table-cell">Last used</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -133,8 +133,8 @@ function Settings() {
                     <TableCell>
                       <Badge variant={tk.scope === 'admin' ? 'default' : 'secondary'}>{tk.scope}</Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{tk.prefix}…</TableCell>
-                    <TableCell className="text-muted-foreground">{fmtAgo(tk.lastUsedAt)}</TableCell>
+                    <TableCell className="font-mono text-xs hidden md:table-cell">{tk.prefix}…</TableCell>
+                    <TableCell className="text-muted-foreground hidden md:table-cell">{fmtAgo(tk.lastUsedAt)}</TableCell>
                     <TableCell className="text-right">
                       <ConfirmButton title={`Revoke “${tk.name}”?`} action="Revoke" onConfirm={() => revoke.mutate(tk.id)}>
                         <Button size="icon" variant="ghost">
@@ -159,8 +159,8 @@ function Settings() {
               ['Claude Code', `claude mcp add --transport http iptv ${origin}/mcp --header "Authorization: Bearer <ADMIN_TOKEN>"`],
               ['JSON config', JSON.stringify({ mcpServers: { iptv: { type: 'http', url: `${origin}/mcp`, headers: { Authorization: 'Bearer <ADMIN_TOKEN>' } } } })],
             ].map(([label, text]) => (
-              <div key={label} className="flex items-center gap-2 text-sm">
-                <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
+              <div key={label} className="grid grid-cols-[1fr_auto] items-center gap-x-2 text-sm sm:flex">
+                <span className="col-span-2 text-xs text-muted-foreground sm:w-28 sm:shrink-0 sm:text-sm">{label}</span>
                 <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs">{text}</code>
                 <Button size="icon" variant="ghost" onClick={() => copy(text)}>
                   <Copy />
