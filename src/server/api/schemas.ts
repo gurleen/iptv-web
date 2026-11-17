@@ -30,6 +30,7 @@ export const Source = z
     username: z.string(),
     streamFormat: z.enum(['ts', 'm3u8']),
     userAgent: z.string().nullable(),
+    fetchMode: z.enum(['direct', 'browser']),
     enabled: z.boolean(),
     priority: z.number().int(),
     lastSyncAt: Ts,
@@ -50,6 +51,9 @@ export const SourceInput = z
     password: z.string().min(1),
     streamFormat: z.enum(['ts', 'm3u8']).optional(),
     userAgent: z.string().nullable().optional(),
+    fetchMode: z.enum(['direct', 'browser']).optional().openapi({
+      description: "How to reach the provider. 'browser' routes API/EPG calls through Cloudflare Browser Rendering, for providers that block Worker traffic (HTTP 403).",
+    }),
     enabled: z.boolean().optional(),
     priority: z.number().int().optional(),
     createEpgSource: z.boolean().optional().openapi({ description: "Also register the provider's xmltv.php as an EPG source (default true)" }),

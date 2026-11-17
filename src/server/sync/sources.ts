@@ -1,4 +1,5 @@
 import { jsonChunks } from '../db'
+import { fetcherFor, type UpstreamFetcher } from '../lib/upstream'
 import { XtreamClient } from '../lib/xtream'
 
 export type SourceRow = {
@@ -9,11 +10,12 @@ export type SourceRow = {
   password: string
   user_agent: string | null
   stream_format: string
+  fetch_mode: string
   enabled: number
 }
 
-export function clientFor(s: Pick<SourceRow, 'base_url' | 'username' | 'password' | 'user_agent'>) {
-  return new XtreamClient({ baseUrl: s.base_url, username: s.username, password: s.password, userAgent: s.user_agent })
+export function clientFor(s: Pick<SourceRow, 'base_url' | 'username' | 'password' | 'user_agent'>, fetcher?: UpstreamFetcher) {
+  return new XtreamClient({ baseUrl: s.base_url, username: s.username, password: s.password, userAgent: s.user_agent }, fetcher)
 }
 
 export async function getSourceRow(env: Env, id: string) {
@@ -27,10 +29,13 @@ export async function syncSource(env: Env, sourceId: string): Promise<SyncResult
   const src = await getSourceRow(env, sourceId)
   if (!src) return { sourceId, ok: false, error: 'not found' }
   const started = Date.now()
+  const fetcher = fetcherFor(env, src.fetch_mode, src.user_agent)
   try {
-    const client = clientFor(src)
+    const client = clientFor(src, fetcher)
     const account = await client.account()
-    const [cats, streams] = await Promise.all([client.liveCategories(), client.liveStreams()])
+    // sequential: a browser session runs one page fetch at a time
+    const cats = await client.liveCategories()
+    const streams = await client.liveStreams()
     const catNames = new Map(cats.map((c) => [String(c.category_id), c.category_name]))
 
     const rows = streams
@@ -91,6 +96,8 @@ export async function syncSource(env: Env, sourceId: string): Promise<SyncResult
       .bind(Date.now(), error, Date.now(), sourceId)
       .run()
     return { sourceId, ok: false, error }
+  } finally {
+    await fetcher.close()
   }
 }
 

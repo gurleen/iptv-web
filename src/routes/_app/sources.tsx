@@ -18,8 +18,8 @@ import { api, fmtAgo, type Source } from '@/lib/api'
 
 export const Route = createFileRoute('/_app/sources')({ component: Sources })
 
-type Form = { name: string; baseUrl: string; username: string; password: string; streamFormat: 'ts' | 'm3u8'; userAgent: string; enabled: boolean; priority: number; createEpgSource: boolean }
-const blank: Form = { name: '', baseUrl: '', username: '', password: '', streamFormat: 'ts', userAgent: '', enabled: true, priority: 100, createEpgSource: true }
+type Form = { name: string; baseUrl: string; username: string; password: string; streamFormat: 'ts' | 'm3u8'; fetchMode: 'direct' | 'browser'; userAgent: string; enabled: boolean; priority: number; createEpgSource: boolean }
+const blank: Form = { name: '', baseUrl: '', username: '', password: '', streamFormat: 'ts', fetchMode: 'direct', userAgent: '', enabled: true, priority: 100, createEpgSource: true }
 
 function Sources() {
   const sources = useQuery({ queryKey: ['sources'], queryFn: () => api<Source[]>('/sources') })
@@ -61,7 +61,14 @@ function Sources() {
                 const exp = info.exp_date ? new Date(Number(info.exp_date) * 1000).toLocaleDateString() : null
                 return (
                   <TableRow key={s.id} className={s.enabled ? '' : 'opacity-50'}>
-                    <TableCell className="font-medium">{s.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {s.name}
+                      {s.fetchMode === 'browser' && (
+                        <Badge variant="outline" className="ml-2" title="API and EPG calls go through Cloudflare Browser Rendering">
+                          via browser
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="max-w-48 truncate text-muted-foreground">{s.baseUrl}</TableCell>
                     <TableCell className="tabular-nums">{s.channelCount?.toLocaleString()}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
@@ -173,6 +180,20 @@ function SourceDialog({ id, initial, onClose }: { id?: string; initial: Form; on
               <Input type="number" value={f.priority} onChange={(e) => set('priority', Number(e.target.value))} />
             </Field>
           </div>
+          <Field
+            label="Connect via"
+            hint="If the provider returns HTTP 403 to the Worker, use the browser: login, channel sync and provider EPG go through Cloudflare's headless Chrome. Playback is unaffected."
+          >
+            <Select value={f.fetchMode} onValueChange={(v) => set('fetchMode', v as 'direct' | 'browser')}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="direct">Direct (fastest)</SelectItem>
+                <SelectItem value="browser">Cloudflare Browser (for providers that block Workers)</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
           <Field label="User-Agent (optional)">
             <Input value={f.userAgent} onChange={(e) => set('userAgent', e.target.value)} placeholder="IPTVSmartersPro" />
           </Field>

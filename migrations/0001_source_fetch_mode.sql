@@ -1,0 +1,1 @@
+ALTER TABLE `sources` ADD `fetch_mode` text DEFAULT 'direct' NOT NULL;

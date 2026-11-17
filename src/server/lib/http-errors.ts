@@ -1,3 +1,5 @@
+import { directFetcher, type UpstreamFetcher } from './upstream'
+
 /**
  * Turn a failed upstream response into an actionable message. Upstream IPTV providers often
  * block Cloudflare/datacenter IPs, so we try to say *who* rejected the request.
@@ -25,12 +27,12 @@ export async function describeHttpError(label: string, url: string, res: Respons
 
   let diagnosis: string
   if (mitigated === 'challenge' || /just a moment|attention required|cf-chl|challenge-platform/i.test(body)) {
-    diagnosis = "The provider is behind Cloudflare and served a bot challenge — its firewall is blocking requests from Workers."
+    diagnosis = "The provider is behind Cloudflare and served a bot challenge — its firewall is blocking requests from Workers. Try setting this source to fetch via browser."
   } else if (cfRay || /cloudflare/i.test(server ?? '')) {
-    diagnosis = "The provider is behind Cloudflare and its firewall/WAF rejected the request (common for Worker traffic)."
+    diagnosis = "The provider is behind Cloudflare and it rejected the request (common for Worker traffic). Try setting this source to fetch via browser."
   } else if (res.status === 403 || res.status === 401) {
     diagnosis = (res.status === 401 ? 'Rejected credentials or ' : 'Likely ') +
-      'an IP block: many providers refuse datacenter/Cloudflare IPs. If the same URL works from your home network, route this source through a relay.'
+      'an IP block: many providers refuse datacenter/Cloudflare IPs. Try setting this source to fetch via browser.'
   } else if (res.status === 404) {
     diagnosis = 'Endpoint not found — check the server URL (and port).'
   } else if (res.status >= 500) {
@@ -52,9 +54,14 @@ export async function describeHttpError(label: string, url: string, res: Respons
 }
 
 /** fetch() wrapper that turns network failures into readable errors (without leaking credentials). */
-export async function fetchUpstream(label: string, url: string, init: RequestInit) {
+export async function fetchUpstream(
+  label: string,
+  url: string,
+  init: { headers?: Record<string, string> },
+  fetcher: UpstreamFetcher = directFetcher,
+) {
   try {
-    return await fetch(url, init)
+    return await fetcher.fetch(url, init)
   } catch (e) {
     const u = new URL(url)
     throw new Error(

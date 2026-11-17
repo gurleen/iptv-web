@@ -23,6 +23,8 @@
 		}
 	],
 	"r2_buckets": [{ "binding": "BUCKET", "bucket_name": "iptv-web" }],
+	// Headless Chrome, for providers that block plain Worker requests (source fetchMode = "browser").
+	"browser": { "binding": "BROWSER" },
 	"triggers": {
 		// Full refresh (sources -> EPG -> event rules) every 6 hours,
 		// plus a light event-rule pass every 30 minutes.

@@ -1,4 +1,5 @@
 import { describeHttpError, fetchUpstream } from './http-errors'
+import { directFetcher, type UpstreamFetcher } from './upstream'
 
 /** Minimal Xtream Codes player_api client (live TV only). */
 
@@ -48,7 +49,10 @@ export function normalizeBaseUrl(url: string) {
 }
 
 export class XtreamClient {
-  constructor(private creds: XtreamCreds) {}
+  constructor(
+    private creds: XtreamCreds,
+    private fetcher: UpstreamFetcher = directFetcher,
+  ) {}
 
   private get base() {
     return normalizeBaseUrl(this.creds.baseUrl)
@@ -70,7 +74,7 @@ export class XtreamClient {
   private async get<T>(action?: string, extra?: Record<string, string>): Promise<T> {
     const label = `Xtream ${action ?? 'login'}`
     const url = this.apiUrl(action, extra)
-    const res = await fetchUpstream(label, url, { headers: this.headers() })
+    const res = await fetchUpstream(label, url, { headers: this.headers() }, this.fetcher)
     if (!res.ok) throw await describeHttpError(label, url, res, [this.creds.username, this.creds.password])
     const text = await res.text()
     try {

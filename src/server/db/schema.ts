@@ -25,6 +25,8 @@ export const sources = sqliteTable('sources', {
   /** Container used when redirecting to the provider: ts | m3u8 */
   streamFormat: text('stream_format').notNull().default('ts'),
   userAgent: text('user_agent'),
+  /** direct = Worker fetch; browser = via Browser Rendering (for providers that block Worker traffic) */
+  fetchMode: text('fetch_mode').notNull().default('direct'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
   /** Lower number wins when a lineup channel has streams from several sources. */
   priority: integer('priority').notNull().default(100),

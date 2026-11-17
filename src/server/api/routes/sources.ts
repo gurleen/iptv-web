@@ -2,6 +2,7 @@ import { z } from '@hono/zod-openapi'
 import { eq, sql } from 'drizzle-orm'
 import { schema } from '../../db'
 import { newId } from '../../lib/ids'
+import { fetcherFor } from '../../lib/upstream'
 import { XtreamClient, normalizeBaseUrl } from '../../lib/xtream'
 import { syncAllSources, syncSource } from '../../sync/sources'
 import { HttpError, IdParam, db, newRouter, notFound, route, valid } from '../hono'
@@ -20,7 +21,7 @@ const app = newRouter()
 
 function serialize(row: typeof schema.sources.$inferSelect, channelCount?: number): z.infer<typeof Source> {
   const { password: _pw, ...rest } = row
-  return { ...rest, streamFormat: rest.streamFormat as 'ts' | 'm3u8', accountInfo: rest.accountInfo ?? null, channelCount }
+  return { ...rest, streamFormat: rest.streamFormat as 'ts' | 'm3u8', fetchMode: rest.fetchMode as 'direct' | 'browser', accountInfo: rest.accountInfo ?? null, channelCount }
 }
 
 async function counts(env: Env) {
@@ -56,16 +57,19 @@ app.openapi(
     path: '/sources/test',
     tags: T,
     summary: 'Test Xtream credentials without saving',
-    body: SourceInput.pick({ baseUrl: true, username: true, password: true, userAgent: true }),
+    body: SourceInput.pick({ baseUrl: true, username: true, password: true, userAgent: true, fetchMode: true }),
     response: z.object({ ok: z.boolean(), account: z.unknown().optional(), error: z.string().optional() }),
   }),
   async (c) => {
     const b = valid(c, 'json') as z.infer<typeof SourceInput>
+    const fetcher = fetcherFor(c.env, b.fetchMode, b.userAgent)
     try {
-      const account = await new XtreamClient(b).account()
+      const account = await new XtreamClient(b, fetcher).account()
       return c.json({ ok: true, account: account.user_info })
     } catch (e) {
       return c.json({ ok: false, error: e instanceof Error ? e.message : String(e) })
+    } finally {
+      await fetcher.close()
     }
   },
 )
@@ -84,10 +88,13 @@ app.openapi(
   async (c) => {
     const b = valid(c, 'json') as z.infer<typeof SourceInput>
     const baseUrl = normalizeBaseUrl(b.baseUrl)
+    const fetcher = fetcherFor(c.env, b.fetchMode, b.userAgent)
     try {
-      await new XtreamClient({ ...b, baseUrl }).account()
+      await new XtreamClient({ ...b, baseUrl }, fetcher).account()
     } catch (e) {
       throw new HttpError(422, `Could not authenticate: ${e instanceof Error ? e.message : e}`)
+    } finally {
+      await fetcher.close()
     }
     const id = newId('src')
     const now = Date.now()
@@ -99,6 +106,7 @@ app.openapi(
       password: b.password,
       streamFormat: b.streamFormat ?? 'ts',
       userAgent: b.userAgent ?? null,
+      fetchMode: b.fetchMode ?? 'direct',
       enabled: b.enabled ?? true,
       priority: b.priority ?? 100,
       createdAt: now,

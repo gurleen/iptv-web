@@ -1,5 +1,6 @@
 import { bumpVersion, jsonChunks } from '../db'
 import { describeHttpError, fetchUpstream } from '../lib/http-errors'
+import { directFetcher, fetcherFor, type UpstreamFetcher } from '../lib/upstream'
 import { parseXmltv, type XmltvChannel, type XmltvProgramme } from '../lib/xmltv'
 import { clientFor, getSourceRow } from './sources'
 
@@ -22,10 +23,10 @@ async function resolveUrl(env: Env, row: EpgSourceRow) {
     if (!row.source_id) throw new Error('xtream EPG source has no linked source')
     const src = await getSourceRow(env, row.source_id)
     if (!src) throw new Error('linked source missing')
-    return { url: clientFor(src).xmltvUrl(), userAgent: src.user_agent }
+    return { url: clientFor(src).xmltvUrl(), userAgent: src.user_agent, fetcher: fetcherFor(env, src.fetch_mode, src.user_agent) }
   }
   if (!row.url) throw new Error('no URL')
-  return { url: row.url, userAgent: null }
+  return { url: row.url, userAgent: null, fetcher: directFetcher as UpstreamFetcher }
 }
 
 /** Values in the URL that must not be echoed back (Xtream creds live in the query string). */
@@ -44,9 +45,12 @@ export async function syncEpgSource(env: Env, epgSourceId: string): Promise<EpgS
   const row = await env.DB.prepare('SELECT * FROM epg_sources WHERE id = ?').bind(epgSourceId).first<EpgSourceRow>()
   if (!row) return { epgSourceId, ok: false, error: 'not found' }
   const started = Date.now()
+  let fetcher: UpstreamFetcher = directFetcher
   try {
-    const { url, userAgent } = await resolveUrl(env, row)
-    const res = await fetchUpstream('EPG download', url, { headers: { 'user-agent': userAgent || 'Mozilla/5.0 iptv-web', accept: '*/*' } })
+    const resolved = await resolveUrl(env, row)
+    const { url, userAgent } = resolved
+    fetcher = resolved.fetcher
+    const res = await fetchUpstream('EPG download', url, { headers: { 'user-agent': userAgent || 'Mozilla/5.0 iptv-web', accept: '*/*' } }, fetcher)
     if (!res.ok) throw await describeHttpError('EPG download', url, res, secretsIn(url))
     if (!res.body) throw new Error('EPG download returned an empty body')
 
@@ -129,6 +133,8 @@ export async function syncEpgSource(env: Env, epgSourceId: string): Promise<EpgS
       .bind(Date.now(), error, Date.now(), epgSourceId)
       .run()
     return { epgSourceId, ok: false, error }
+  } finally {
+    await fetcher.close()
   }
 }
 
