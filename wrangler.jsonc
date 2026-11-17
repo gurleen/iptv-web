@@ -28,7 +28,8 @@
 		// plus a light event-rule pass every 30 minutes.
 		"crons": ["0 */6 * * *", "*/30 * * * *"]
 	},
-	// On Workers Paid, add  "limits": { "cpu_ms": 300000 }  so large provider lists / EPGs can sync.
+	// Large provider lists / EPGs need more than the default 30s of CPU (Workers Paid only).
+	"limits": { "cpu_ms": 300000 },
 	"vars": {
 		// Public base URL used in M3U/EPG links. Leave empty to derive from the request.
 		"PUBLIC_URL": "",
