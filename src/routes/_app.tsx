@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Outlet, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { CalendarClock, Database, LayoutDashboard, ListVideo, LogOut, Moon, Newspaper, Search, Settings, Sun, Tv } from 'lucide-react'
+import { CalendarClock, Database, LayoutDashboard, LayoutGrid, ListVideo, LogOut, Moon, Newspaper, Search, Settings, Sun, Tv } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,7 @@ export const Route = createFileRoute('/_app')({ component: AppLayout, ssr: false
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/lineup', label: 'Lineup', icon: ListVideo },
+  { to: '/guide', label: 'Guide', icon: LayoutGrid },
   { to: '/browse', label: 'Browse sources', icon: Search },
   { to: '/events', label: 'Events', icon: CalendarClock },
   { to: '/sources', label: 'Sources', icon: Database },

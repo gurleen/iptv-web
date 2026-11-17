@@ -16,6 +16,7 @@ import output from './routes/output'
 import sourceChannels from './routes/source-channels'
 import sources from './routes/sources'
 import system from './routes/system'
+import viewer from './routes/viewer'
 
 
 const PUBLIC_API = new Set(['/api/auth/login', '/api/auth/logout', '/api/openapi.json', '/api/docs', '/api/guide'])
@@ -32,7 +33,7 @@ api.use('*', async (c, next) => {
   return next()
 })
 
-for (const r of [system, sources, sourceChannels, epg, categories, lineup, events, output]) api.route('/', r)
+for (const r of [system, sources, sourceChannels, epg, categories, lineup, events, output, viewer]) api.route('/', r)
 
 api.doc31('/openapi.json', (c) => ({
   openapi: '3.1.0',

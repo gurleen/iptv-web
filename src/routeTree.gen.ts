@@ -15,6 +15,7 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppBrowseRouteImport } from './routes/_app/browse'
 import { Route as AppEpgRouteImport } from './routes/_app/epg'
 import { Route as AppEventsRouteImport } from './routes/_app/events'
+import { Route as AppGuideRouteImport } from './routes/_app/guide'
 import { Route as AppLineupRouteImport } from './routes/_app/lineup'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSourcesRouteImport } from './routes/_app/sources'
@@ -48,6 +49,11 @@ const AppEventsRoute = AppEventsRouteImport.update({
   path: '/events',
   getParentRoute: () => AppRoute,
 } as any)
+const AppGuideRoute = AppGuideRouteImport.update({
+  id: '/guide',
+  path: '/guide',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppLineupRoute = AppLineupRouteImport.update({
   id: '/lineup',
   path: '/lineup',
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/browse': typeof AppBrowseRoute
   '/epg': typeof AppEpgRoute
   '/events': typeof AppEventsRoute
+  '/guide': typeof AppGuideRoute
   '/lineup': typeof AppLineupRoute
   '/settings': typeof AppSettingsRoute
   '/sources': typeof AppSourcesRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByTo {
   '/browse': typeof AppBrowseRoute
   '/epg': typeof AppEpgRoute
   '/events': typeof AppEventsRoute
+  '/guide': typeof AppGuideRoute
   '/lineup': typeof AppLineupRoute
   '/settings': typeof AppSettingsRoute
   '/sources': typeof AppSourcesRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   '/_app/browse': typeof AppBrowseRoute
   '/_app/epg': typeof AppEpgRoute
   '/_app/events': typeof AppEventsRoute
+  '/_app/guide': typeof AppGuideRoute
   '/_app/lineup': typeof AppLineupRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/sources': typeof AppSourcesRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
     | '/browse'
     | '/epg'
     | '/events'
+    | '/guide'
     | '/lineup'
     | '/settings'
     | '/sources'
@@ -113,6 +123,7 @@ export interface FileRouteTypes {
     | '/browse'
     | '/epg'
     | '/events'
+    | '/guide'
     | '/lineup'
     | '/settings'
     | '/sources'
@@ -124,6 +135,7 @@ export interface FileRouteTypes {
     | '/_app/browse'
     | '/_app/epg'
     | '/_app/events'
+    | '/_app/guide'
     | '/_app/lineup'
     | '/_app/settings'
     | '/_app/sources'
@@ -179,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppEventsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/guide': {
+      id: '/_app/guide'
+      path: '/guide'
+      fullPath: '/guide'
+      preLoaderRoute: typeof AppGuideRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/lineup': {
       id: '/_app/lineup'
       path: '/lineup'
@@ -207,6 +226,7 @@ interface AppRouteChildren {
   AppBrowseRoute: typeof AppBrowseRoute
   AppEpgRoute: typeof AppEpgRoute
   AppEventsRoute: typeof AppEventsRoute
+  AppGuideRoute: typeof AppGuideRoute
   AppLineupRoute: typeof AppLineupRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSourcesRoute: typeof AppSourcesRoute
@@ -217,6 +237,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppBrowseRoute: AppBrowseRoute,
   AppEpgRoute: AppEpgRoute,
   AppEventsRoute: AppEventsRoute,
+  AppGuideRoute: AppGuideRoute,
   AppLineupRoute: AppLineupRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSourcesRoute: AppSourcesRoute,
