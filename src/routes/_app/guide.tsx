@@ -4,11 +4,12 @@ import { ChevronLeft, ChevronRight, Clock, Play, Trophy } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Empty, PageHeader } from '@/components/app/page-header'
 import { Player } from '@/components/app/player'
+import { GameChip } from '@/components/app/game-chip'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { api, qs } from '@/lib/api'
+import { api, qs, type Game } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 type Programme = {
@@ -77,6 +78,12 @@ function Guide() {
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<{ p: Programme; ch: GuideChannel } | null>(null)
   const [playing, setPlaying] = useState<GuideChannel | null>(null)
+  const linkedGame = useQuery({
+    queryKey: ['event-game', selected?.p.eventId],
+    queryFn: () => api<{ game?: Game | null }>(`/events/${selected!.p.eventId}?withGame=true`),
+    enabled: !!selected?.p.eventId,
+    select: (e) => e.game ?? null,
+  })
   const scroller = useRef<HTMLDivElement>(null)
   const narrow = useNarrow()
   const LEFT = narrow ? 120 : 220 // channel column width
@@ -286,6 +293,7 @@ function Guide() {
                 {selected.p.episode && <Badge variant="outline">{selected.p.episode}</Badge>}
                 <Badge variant="outline">{Math.round((selected.p.stop - selected.p.start) / 60_000)} min</Badge>
               </div>
+              {linkedGame.data && <GameChip game={linkedGame.data} className="w-full max-w-xs text-sm" />}
               {selected.p.subtitle && <p className="font-medium">{selected.p.subtitle}</p>}
               {selected.p.icon && <img src={selected.p.icon} alt="" className="max-h-48 rounded-md" />}
               <p className="whitespace-pre-line text-muted-foreground">{selected.p.description ?? 'No description.'}</p>

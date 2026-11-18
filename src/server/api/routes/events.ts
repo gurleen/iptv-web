@@ -3,6 +3,7 @@ import { batchRun, bumpVersion } from '../../db'
 import { getRule, previewRule, runAllRules, runRule, type RuleRow } from '../../events/rules'
 import { newId } from '../../lib/ids'
 import { eventStatus } from '../../output/lineup'
+import { gamesForEvents, matchEvents } from '../../sports/match'
 import { HttpError, IdParam, newRouter, notFound, route, valid } from '../hono'
 import { Event, EventInput, EventPatch, EventStatus, OkSchema, PageQuery, Rule, RuleInput, RulePatch, paginated } from '../schemas'
 
@@ -49,6 +50,9 @@ async function loadEvents(env: Env, where = '', args: unknown[] = [], tail = '')
       ruleId: e.rule_id,
       locked: !!e.locked,
       metadata: e.metadata ? JSON.parse(e.metadata) : null,
+      gameLeague: e.game_league ?? null,
+      gameId: e.game_id ?? null,
+      gameLink: e.game_link ?? null,
       channels: (JSON.parse(e.chans || '[]') as any[]).sort((a, b) => a.priority - b.priority),
       createdAt: e.created_at,
       updatedAt: e.updated_at,
@@ -71,6 +75,7 @@ const ListQuery = z.object({
   from: z.coerce.number().optional().openapi({ description: 'Only events starting at/after (epoch ms)' }),
   to: z.coerce.number().optional().openapi({ description: 'Only events starting before (epoch ms)' }),
   includeHidden: z.enum(['true', 'false']).optional(),
+  withGames: z.enum(['true', 'false']).optional().openapi({ description: 'Attach the linked game (scores/status) to each event' }),
   ...PageQuery,
 })
 
@@ -110,13 +115,30 @@ app.openapi(
     const filtered = all.filter((e) => statuses.includes(e.status))
     const limit = q.limit ?? 100
     const offset = q.offset ?? 0
-    return c.json({ items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset })
+    const page = filtered.slice(offset, offset + limit)
+    if (q.withGames === 'true') {
+      const games = await gamesForEvents(c.env, page)
+      for (const e of page) (e as any).game = games.get(e.id) ?? null
+    }
+    return c.json({ items: page, total: filtered.length, limit, offset })
   },
 )
 
 app.openapi(
-  route({ method: 'get', path: '/events/{id}', tags: T, summary: 'Get an event', params: IdParam, response: Event }),
-  async (c) => c.json(await getEvent(c.env, (valid(c, 'param') as { id: string }).id)),
+  route({
+    method: 'get',
+    path: '/events/{id}',
+    tags: T,
+    summary: 'Get an event',
+    params: IdParam,
+    query: z.object({ withGame: z.enum(['true', 'false']).optional() }),
+    response: Event,
+  }),
+  async (c) => {
+    const e = await getEvent(c.env, (valid(c, 'param') as { id: string }).id)
+    if ((valid(c, 'query') as { withGame?: string }).withGame === 'true') (e as any).game = (await gamesForEvents(c.env, [e])).get(e.id) ?? null
+    return c.json(e)
+  },
 )
 
 function channelStmts(env: Env, id: string, channels: z.infer<typeof EventInput>['channels']) {
@@ -149,6 +171,7 @@ app.openapi(
       ),
       ...channelStmts(c.env, id, b.channels),
     ])
+    await matchEvents(c.env, { eventIds: [id] }).catch(() => {})
     return c.json(await getEvent(c.env, id), 201)
   },
 )
@@ -171,6 +194,8 @@ async function patchEvent(env: Env, id: string, b: z.infer<typeof EventPatch>) {
   }
   // editing a rule-generated event pins it so rule runs don't undo the change
   if (b.locked === undefined) sets.push('locked = 1')
+  // the teams/time may have changed: drop automatic game links so they get re-matched
+  if (b.title !== undefined || b.startsAt !== undefined || b.league !== undefined) sets.push("game_link = CASE WHEN game_link = 'auto' THEN NULL ELSE game_link END")
   sets.push('updated_at = ?')
   args.push(Date.now())
   return [env.DB.prepare(`UPDATE events SET ${sets.join(', ')} WHERE id = ?`).bind(...args, id), ...channelStmts(env, id, b.channels)]
@@ -191,6 +216,7 @@ app.openapi(
     const { id } = valid(c, 'param') as { id: string }
     await getEvent(c.env, id)
     await c.env.DB.batch(await patchEvent(c.env, id, valid(c, 'json') as z.infer<typeof EventPatch>))
+    await matchEvents(c.env, { eventIds: [id] }).catch(() => {})
     return c.json(await getEvent(c.env, id))
   },
 )

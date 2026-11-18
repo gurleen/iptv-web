@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { ConfirmButton } from '@/components/app/confirm'
 import { Field } from '@/components/app/field'
+import { GameChip } from '@/components/app/game-chip'
 import { Empty, PageHeader } from '@/components/app/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { useMutate } from '@/hooks/use-mutate'
-import { api, fmtAgo, fmtTime, qs, type Category, type Event, type LineupChannel, type Page, type Rule } from '@/lib/api'
+import { api, fmtAgo, fmtTime, qs, type Category, type Event, type Game, type LineupChannel, type Page, type Rule } from '@/lib/api'
 
 export const Route = createFileRoute('/_app/events')({ component: Events })
 
@@ -46,7 +47,7 @@ function Events() {
 function EventList() {
   const [status, setStatus] = useState('scheduled,live')
   const [editing, setEditing] = useState<Event | 'new' | null>(null)
-  const list = useQuery({ queryKey: ['events', status], queryFn: () => api<Page<Event>>(`/events${qs({ status, limit: 500, includeHidden: 'true' })}`) })
+  const list = useQuery({ queryKey: ['events', status], queryFn: () => api<Page<Event>>(`/events${qs({ status, limit: 500, includeHidden: 'true', withGames: 'true' })}`), refetchInterval: 60_000 })
   const patch = useMutate((v: { id: string; body: Record<string, unknown> }) => api(`/events/${v.id}`, { method: 'PATCH', body: v.body }), { invalidate: INV })
   const del = useMutate((id: string) => api(`/events/${id}`, { method: 'DELETE' }), { invalidate: INV, success: 'Deleted' })
 
@@ -100,6 +101,7 @@ function EventList() {
                       {[e.sport, e.league, e.origin === 'rule' ? 'auto' : null].filter(Boolean).join(' · ')}
                       <span className="md:hidden">{e.channels.length ? ` · ${e.channels.map((c) => c.name).join(', ')}` : ''}</span>
                     </div>
+                    {(e as Event & { game?: Game | null }).game && <GameChip game={(e as Event & { game: Game }).game} className="mt-1.5 w-56" />}
                   </TableCell>
                   <TableCell className="text-sm hidden md:table-cell">
                     {e.channels.map((c) => c.name).join(', ') || <span className="text-muted-foreground">none</span>}

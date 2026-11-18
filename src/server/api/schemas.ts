@@ -243,6 +243,10 @@ export const Event = z
     ruleId: z.string().nullable(),
     locked: z.boolean(),
     metadata: z.record(z.string(), z.unknown()).nullable(),
+    gameLeague: z.string().nullable().openapi({ description: 'Linked game league (see /api/sports)' }),
+    gameId: z.string().nullable(),
+    gameLink: z.enum(['auto', 'manual', 'none']).nullable().openapi({ description: 'How the game link was made; none = explicitly unlinked' }),
+    game: z.unknown().optional().openapi({ description: 'Linked Game, when requested with withGames=true' }),
     channels: z.array(
       z.object({ lineupChannelId: z.string(), name: z.string(), number: z.number().nullable(), label: z.string().nullable(), priority: z.number() }),
     ),

@@ -13,6 +13,7 @@ export type Event = z.infer<typeof S.Event>
 export type Rule = z.infer<typeof S.Rule>
 export type Token = z.infer<typeof S.Token>
 export type Job = z.infer<typeof S.Job>
+export type { Game } from '@/server/sports/espn'
 export type Page<T> = { items: T[]; total: number; limit: number; offset: number }
 
 export class ApiError extends Error {

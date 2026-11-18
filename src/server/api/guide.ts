@@ -48,4 +48,15 @@ before large destructive changes (restore with \`POST /api/lineup/import\`).
   optionally limited with \`lineupCategoryIds\`.
 - Manual: \`POST /api/events {"title","startsAt":"2026-12-07T22:00:00-05:00","sport","channels":[{"lineupChannelId":"ch_…","label":"Main"}]}\`.
 - Event times are epoch ms in responses; inputs accept epoch ms or ISO-8601.
+
+## Sports metadata (NFL, NBA, NHL, NCAAF, NCAAM, NCAAW)
+- \`GET /api/sports/{league}/scoreboard?date=YYYY-MM-DD[&to=…][&team=GB]\` — schedule, live scores, results.
+- \`GET /api/sports/{league}/games/{gameId}\` — box score, leaders, injuries, odds, win probability.
+- \`GET /api/sports/{league}/teams\`, \`/teams/{team}\` (record, next game), \`/teams/{team}/schedule\`, \`/teams/{team}/stats\`;
+  \`{team}\` accepts an id, abbreviation or name. \`GET /api/sports/{league}/standings\`.
+- Events are linked to games automatically (league field or "NFL: …" title prefix + team names + start time).
+  Check with \`GET /api/events?withGames=true\`; fix with \`PUT /api/events/{id}/game {"league","gameId"}\`
+  (nulls unlink); re-run with \`POST /api/events/match-games\`. Give events a \`league\` (e.g. "NFL") so they match.
+- \`/api/output/events.json\` includes a \`game\` object for linked events. Output tokens can read \`/api/sports/*\` too.
+- MCP: sports_scoreboard, sports_game, sports_teams, sports_team, sports_standings, match_event_games, link_event_game.
 `

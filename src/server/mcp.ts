@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { z } from 'zod'
 import { AGENT_GUIDE } from './api/guide'
+import { LEAGUE_IDS } from './sports/leagues'
 
 /** Calls the REST API in-process, as the MCP caller (same bearer token). */
 export type ApiCaller = (method: string, path: string, body?: unknown) => Promise<{ status: number; data: unknown }>
@@ -309,6 +310,7 @@ export function buildMcpServer(api: ApiCaller) {
       origin: z.enum(['manual', 'rule']).optional(),
       from: z.number().optional(),
       to: z.number().optional(),
+      withGames: z.boolean().optional().describe('Attach linked game data (teams, score, status)'),
       ...page,
     },
     (a) => api('GET', `/events${qs(a)}`),
@@ -352,6 +354,70 @@ export function buildMcpServer(api: ApiCaller) {
     (a) => api('DELETE', `/event-rules/${a.id}${qs({ keepEvents: a.keepEvents })}`),
   )
   tool('run_event_rules', 'Run all enabled event rules now.', {}, () => api('POST', '/event-rules/run'))
+
+  // ---------- sports metadata ----------
+  const league = z.enum(LEAGUE_IDS).describe('nfl | nba | nhl | ncaaf | ncaam | ncaaw')
+  tool(
+    'sports_scoreboard',
+    'Games for a league on a date or date range: schedule, live scores/clock, results, records, broadcasts, odds. Use to find game ids.',
+    {
+      league,
+      date: z.string().optional().describe('YYYY-MM-DD or today/yesterday/tomorrow (default today)'),
+      to: z.string().optional().describe('End date for a range (max 14 days)'),
+      team: z.string().optional().describe('Filter by team id/abbreviation/name'),
+      state: z.enum(['pre', 'in', 'post']).optional(),
+    },
+    ({ league: l, ...q }) => api('GET', `/sports/${l}/scoreboard${qs(q)}`),
+    true,
+  )
+  tool(
+    'sports_game',
+    'Full detail for one game (box score, leaders, injuries, odds, win probability). Pass league+gameId, or eventId for an event linked to a game.',
+    { league: league.optional(), gameId: z.string().optional(), eventId: z.string().optional() },
+    (a) => (a.eventId ? api('GET', `/events/${a.eventId}/game`) : api('GET', `/sports/${a.league}/games/${a.gameId}`)),
+    true,
+  )
+  tool(
+    'sports_teams',
+    'List/search teams in a league (ids, abbreviations, names, logos, colors).',
+    { league, q: z.string().optional() },
+    ({ league: l, q }) => api('GET', `/sports/${l}/teams${qs({ q })}`),
+    true,
+  )
+  tool(
+    'sports_team',
+    'Team detail (record, standing, next game). include adds the season schedule and/or season stats.',
+    { league, team: z.string().describe('Team id, abbreviation or name'), include: z.array(z.enum(['schedule', 'stats'])).optional(), season: z.string().optional() },
+    async ({ league: l, team, include, season }) => {
+      const t = encodeURIComponent(team)
+      const detail = await api('GET', `/sports/${l}/teams/${t}`)
+      if (detail.status >= 400 || !include?.length) return detail
+      const data: Record<string, unknown> = { ...(detail.data as object) }
+      if (include.includes('schedule')) data.schedule = (await api('GET', `/sports/${l}/teams/${t}/schedule${qs({ season })}`)).data
+      if (include.includes('stats')) data.stats = (await api('GET', `/sports/${l}/teams/${t}/stats`)).data
+      return { status: 200, data }
+    },
+    true,
+  )
+  tool(
+    'sports_standings',
+    'League standings grouped by conference/division (wins, losses, pct, streak, etc. as provided).',
+    { league, season: z.string().optional() },
+    ({ league: l, season }) => api('GET', `/sports/${l}/standings${qs({ season })}`),
+    true,
+  )
+  tool(
+    'match_event_games',
+    "Link events to real games using league + team names in the title + start time. Runs automatically after rules; manual links aren't touched. force re-checks automatic links.",
+    { eventIds: ids.optional(), force: z.boolean().optional() },
+    (a) => api('POST', '/events/match-games', a),
+  )
+  tool(
+    'link_event_game',
+    'Manually link an event to a game (find gameId with sports_scoreboard), or pass nulls to unlink and stop auto-matching.',
+    { eventId: z.string(), league: league.nullable(), gameId: z.string().nullable() },
+    ({ eventId, ...b }) => api('PUT', `/events/${eventId}/game`, b),
+  )
 
   // ---------- backup / outputs ----------
   tool('export_lineup', 'Full lineup snapshot (categories, channels, streams, events, rules) — take one before big changes.', {}, () => api('GET', '/lineup/export'), true)

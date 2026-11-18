@@ -44,6 +44,8 @@ export type OutputEvent = {
   endsAt: number | null
   status: EventStatus
   origin: string
+  gameLeague: string | null
+  gameId: string | null
   channels: { id: string; label: string | null; name: string; number: number | null; tvgId: string }[]
 }
 
@@ -79,6 +81,8 @@ export async function loadEvents(
         endsAt: e.ends_at,
         status: eventStatus(e as any, now),
         origin: e.origin,
+        gameLeague: e.game_league ?? null,
+        gameId: e.game_id ?? null,
         channels: chans.map(({ priority: _p, ...c }) => c),
       } satisfies OutputEvent
     })

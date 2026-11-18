@@ -204,6 +204,11 @@ export const events = sqliteTable(
     /** Rule runs never overwrite or delete locked events (set automatically on manual edit). */
     locked: integer('locked', { mode: 'boolean' }).notNull().default(false),
     metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>(),
+    /** Linked real-world game (sports metadata), e.g. gameLeague 'nfl' + gameId '401772938' */
+    gameLeague: text('game_league'),
+    gameId: text('game_id'),
+    /** auto = matched by teams/time, manual = set by user/agent, none = explicitly unlinked (don't auto-match) */
+    gameLink: text('game_link'),
     ...timestamps,
   },
   (t) => [uniqueIndex('events_dedupe_idx').on(t.dedupeKey), index('events_start_idx').on(t.startsAt)],
@@ -288,3 +293,10 @@ export const jobs = sqliteTable(
   },
   (t) => [index('jobs_created_idx').on(t.createdAt)],
 )
+
+/** Cached, normalised responses from the sports data provider. */
+export const sportsCache = sqliteTable('sports_cache', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+})

@@ -3,6 +3,8 @@ import { parseEventDate, stripDateText } from '../lib/dates'
 import { newId, sha256Hex } from '../lib/ids'
 import { cleanChannelName } from '../lib/names'
 import { epgDays } from '../sync/epg'
+import { matchEvents } from '../sports/match'
+import { pruneCache } from '../sports/service'
 
 export type RuleRow = {
   id: string
@@ -296,5 +298,12 @@ export async function runAllRules(env: Env) {
   await env.DB.prepare(`DELETE FROM events WHERE origin = 'rule' AND locked = 0 AND ends_at IS NOT NULL AND ends_at < ?`)
     .bind(Date.now() - 24 * 3600_000)
     .run()
+  // link newly created events to real games (best-effort; sports data is an enrichment)
+  try {
+    await matchEvents(env)
+    await pruneCache(env)
+  } catch (e) {
+    console.error('game matching failed', e)
+  }
   return out
 }

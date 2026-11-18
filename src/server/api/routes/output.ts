@@ -1,6 +1,8 @@
 import { z } from '@hono/zod-openapi'
 import { baseUrl, loadEvents, loadOutputChannels, streamUrl, type EventStatus } from '../../output/lineup'
+import { gamesForEvents } from '../../sports/match'
 import { newRouter, route, valid } from '../hono'
+import { GameSchema } from './sports'
 import { EventStatus as EventStatusSchema } from '../schemas'
 
 const T = ['Output']
@@ -36,6 +38,9 @@ const OutEvent = z
     startsAtIso: z.string().nullable(),
     endsAtIso: z.string().nullable(),
     status: EventStatusSchema,
+    game: GameSchema.nullable().openapi({
+      description: 'Live metadata for the linked real-world game (teams, logos, records, score, clock, broadcasts, odds). null if not a linked game.',
+    }),
     channels: z.array(z.object({ id: z.string(), name: z.string(), number: z.number().nullable(), tvgId: z.string(), label: z.string().nullable(), streamUrl: z.string() })),
   })
   .openapi('OutputEvent')
@@ -47,7 +52,11 @@ app.openapi(
     tags: T,
     summary: 'The cleaned-up lineup for downstream apps',
     description: 'Accepts an output-scope token via ?token=. Stream URLs embed the same token.',
-    query: z.object({ token: z.string().optional(), events: z.enum(['true', 'false']).optional() }),
+    query: z.object({
+      token: z.string().optional(),
+      events: z.enum(['true', 'false']).optional(),
+      games: z.enum(['true', 'false']).optional().openapi({ description: 'Attach live game metadata to events (default true)' }),
+    }),
     response: z.object({
       generatedAt: z.string(),
       epgUrl: z.string(),
@@ -75,7 +84,7 @@ app.openapi(
       m3uUrl: `${base}/playlist.m3u${tq}`,
       categories: [...groups].map(([name, chs]) => ({ name, channels: chs })),
     }
-    if (c.req.query('events') !== 'false') body.events = await outputEvents(c.env, base, token, channels, {})
+    if (c.req.query('events') !== 'false') body.events = await outputEvents(c.env, base, token, channels, { games: c.req.query('games') !== 'false' })
     return c.json(body as any)
   },
 )
@@ -85,12 +94,14 @@ async function outputEvents(
   base: string,
   token: string | null,
   channels: Awaited<ReturnType<typeof loadOutputChannels>>,
-  opts: { statuses?: EventStatus[]; hoursAhead?: number; sport?: string },
+  opts: { statuses?: EventStatus[]; hoursAhead?: number; sport?: string; games?: boolean },
 ) {
   const byId = new Map(channels.map((c) => [c.id, c]))
-  const evs = await loadEvents(env, { statuses: opts.statuses, hoursAhead: opts.hoursAhead })
+  const evs = (await loadEvents(env, { statuses: opts.statuses, hoursAhead: opts.hoursAhead })).filter(
+    (e) => !opts.sport || e.sport?.toLowerCase() === opts.sport.toLowerCase(),
+  )
+  const games = opts.games === false ? new Map() : await gamesForEvents(env, evs)
   return evs
-    .filter((e) => !opts.sport || e.sport?.toLowerCase() === opts.sport.toLowerCase())
     .map((e) => ({
       id: e.id,
       title: e.title,
@@ -104,6 +115,7 @@ async function outputEvents(
       startsAtIso: e.startsAt ? new Date(e.startsAt).toISOString() : null,
       endsAtIso: e.endsAt ? new Date(e.endsAt).toISOString() : null,
       status: e.status,
+      game: games.get(e.id) ?? null,
       channels: e.channels
         .filter((ch) => byId.has(ch.id))
         .map((ch) => ({ ...ch, streamUrl: streamUrl(base, byId.get(ch.id)!, token) })),
@@ -116,6 +128,7 @@ const EvQuery = z.object({
   hours: z.coerce.number().optional().openapi({ description: 'Only events starting within N hours (default 48)' }),
   sport: z.string().optional(),
   withChannels: z.enum(['true', 'false']).optional().openapi({ description: 'Only events that have a playable channel (default true)' }),
+  games: z.enum(['true', 'false']).optional().openapi({ description: 'Attach live game metadata (default true)' }),
 })
 
 app.openapi(
@@ -125,7 +138,7 @@ app.openapi(
     const base = baseUrl(c.env, c.req.raw)
     const channels = await loadOutputChannels(c.env)
     const statuses = (q.status ?? 'scheduled,live').split(',') as EventStatus[]
-    let evs = await outputEvents(c.env, base, tokenOf(c), channels, { statuses, hoursAhead: q.hours ?? 48, sport: q.sport })
+    let evs = await outputEvents(c.env, base, tokenOf(c), channels, { statuses, hoursAhead: q.hours ?? 48, sport: q.sport, games: q.games !== 'false' })
     if (q.withChannels !== 'false') evs = evs.filter((e) => e.channels.length)
     return c.json(evs as any)
   },

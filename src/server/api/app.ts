@@ -17,6 +17,7 @@ import sourceChannels from './routes/source-channels'
 import sources from './routes/sources'
 import system from './routes/system'
 import viewer from './routes/viewer'
+import sportsRoutes from './routes/sports'
 
 
 const PUBLIC_API = new Set(['/api/auth/login', '/api/auth/logout', '/api/openapi.json', '/api/docs', '/api/guide'])
@@ -28,12 +29,14 @@ api.use('*', async (c, next) => {
   if (PUBLIC_API.has(path)) return next()
   const auth = await authenticate(c.env, c.req.raw)
   if (!auth) return c.json({ error: 'unauthorized' }, 401)
-  if (auth.scope !== 'admin' && !path.startsWith('/api/output/')) return c.json({ error: 'admin token required' }, 403)
+  // output tokens: player outputs plus read-only sports data (for client-side enrichment)
+  const outputAllowed = path.startsWith('/api/output/') || (c.req.method === 'GET' && path.startsWith('/api/sports/'))
+  if (auth.scope !== 'admin' && !outputAllowed) return c.json({ error: 'admin token required' }, 403)
   c.set('auth', auth)
   return next()
 })
 
-for (const r of [system, sources, sourceChannels, epg, categories, lineup, events, output, viewer]) api.route('/', r)
+for (const r of [system, sources, sourceChannels, epg, categories, lineup, events, output, viewer, sportsRoutes]) api.route('/', r)
 
 api.doc31('/openapi.json', (c) => ({
   openapi: '3.1.0',
